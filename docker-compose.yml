@@ -1,0 +1,27 @@
+services:
+  pocketbase:
+    image: ghcr.io/muchobien/pocketbase:latest
+    container_name: kindergarten-pocketbase
+    restart: unless-stopped
+    environment:
+      PB_HOST: 0.0.0.0
+      PB_PORT: 8090
+      PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL:-admin@example.com}
+      PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD:-admin123456}
+      TZ: Asia/Shanghai
+    ports:
+      - "8090:8090"
+    volumes:
+      - pocketbase_data:/pb_data
+      - ./pocketbase/pb_public:/pb_public
+      - ./pocketbase/pb_hooks:/pb_hooks
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8090/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  pocketbase_data:
+    name: kindergarten-pocketbase-data

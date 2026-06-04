@@ -1,0 +1,42 @@
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "/Users/achilles/.ohos/config/default_ohos_j1bya5XgIuQhrkytMyx-PHMhxfnpa6Hf6ObiYYjfG2I=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001B6D0063475F92725C90FD3A2B797A9C7B4E6F129ABEABBE9F34A279114B5B8020629F9A1645C4B0",
+          "profile": "/Users/achilles/.ohos/config/default_ohos_j1bya5XgIuQhrkytMyx-PHMhxfnpa6Hf6ObiYYjfG2I=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "/Users/achilles/.ohos/config/default_ohos_j1bya5XgIuQhrkytMyx-PHMhxfnpa6Hf6ObiYYjfG2I=.p12",
+          "storePassword": "0000001B8D8CF2A130906B0E1E84104DC4F8F15003E97D598F3E6F6FD5E258059A73FA0B79D179374A3698"
+        }
+      }
+    ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "compatibleSdkVersion": "5.0.0(12)",
+        "runtimeOS": "HarmonyOS",
+        "targetSdkVersion": "6.0.2(22)"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}
