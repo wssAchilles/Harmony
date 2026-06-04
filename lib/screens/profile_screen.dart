@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import '../services/app_exception.dart';
 import '../services/borrow_service.dart';
 import '../models/borrow_record.dart';
 import '../services/auth_service.dart';
 import 'category_management_screen.dart';
+import 'profile_view_state.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -21,8 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   String? _userId;
   String? _userEmail;
   String? _userName;
-  List<BorrowRecord> _myBorrows = [];
-  int _myBorrowedTotalCount = 0; // 个人借阅总册数
+  ProfileBorrowSummary _borrowSummary = const ProfileBorrowSummary.empty();
   bool _isLoading = true;
 
   final TextEditingController _nameController = TextEditingController();
@@ -72,10 +73,7 @@ class _ProfileScreenState extends State<ProfileScreen>
           _nameController.text = _userName ?? '';
         });
 
-        // 加载我的借阅记录
-        await _loadMyBorrows();
-        // 加载个人借阅总册数
-        await _loadMyBorrowedCount();
+        await _loadBorrowSummary();
       }
     } catch (e) {
       print('加载用户数据失败: $e');
@@ -84,33 +82,20 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  Future<void> _loadMyBorrows() async {
+  Future<void> _loadBorrowSummary() async {
     try {
       final records = (await _borrowService.getTeacherBorrowHistory(
         _userId!,
-      )).where((record) => record.returnDate == null).toList();
+      ))
+          .where((record) => record.returnDate == null)
+          .toList();
       setState(() {
-        _myBorrows = records;
+        _borrowSummary = ProfileBorrowSummary(activeBorrows: records);
       });
     } catch (e) {
       print('加载借阅记录失败: $e');
-    }
-  }
-
-  // 加载个人借阅总册数（使用RPC函数）
-  Future<void> _loadMyBorrowedCount() async {
-    try {
-      final count = _myBorrows.fold<int>(
-        0,
-        (sum, record) => sum + record.quantity,
-      );
       setState(() {
-        _myBorrowedTotalCount = count;
-      });
-    } catch (e) {
-      print('加载个人借阅总册数失败: $e');
-      setState(() {
-        _myBorrowedTotalCount = 0;
+        _borrowSummary = const ProfileBorrowSummary.empty();
       });
     }
   }
@@ -129,7 +114,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
       _showSnackBar('姓名更新成功', isError: false);
     } catch (e) {
-      _showSnackBar('更新失败: $e');
+      _showSnackBar('更新失败: ${messageForError(e)}');
     }
   }
 
@@ -157,18 +142,17 @@ class _ProfileScreenState extends State<ProfileScreen>
       _showSnackBar('密码修改成功', isError: false);
       Navigator.pop(context);
     } catch (e) {
-      _showSnackBar('密码修改失败: $e');
+      _showSnackBar('密码修改失败: ${messageForError(e)}');
     }
   }
 
   Future<void> _returnBook(int recordId) async {
     try {
       await _borrowService.returnBook(recordId);
-      await _loadMyBorrows();
-      await _loadMyBorrowedCount(); // 重新加载总册数
+      await _loadBorrowSummary();
       _showSnackBar('还书成功', isError: false);
     } catch (e) {
-      _showSnackBar('还书失败: $e');
+      _showSnackBar('还书失败: ${messageForError(e)}');
     }
   }
 
@@ -206,7 +190,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       try {
         await _authService.signOut();
       } catch (e) {
-        _showSnackBar('退出失败: $e');
+        _showSnackBar('退出失败: ${messageForError(e)}');
       }
     }
   }
@@ -380,7 +364,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    '$_myBorrowedTotalCount 本',
+                    '${_borrowSummary.totalQuantity} 本',
                     style: TextStyle(
                       color: Colors.orange.shade700,
                       fontWeight: FontWeight.bold,
@@ -390,7 +374,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               ],
             ),
             const Divider(height: 24),
-            if (_myBorrows.isEmpty)
+            if (_borrowSummary.activeBorrows.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 32),
                 child: Center(
@@ -412,16 +396,22 @@ class _ProfileScreenState extends State<ProfileScreen>
               )
             else
               ...List.generate(
-                _myBorrows.length > 3 ? 3 : _myBorrows.length,
-                (index) => _buildBorrowItem(_myBorrows[index]),
+                _borrowSummary.activeBorrows.length > 3
+                    ? 3
+                    : _borrowSummary.activeBorrows.length,
+                (index) => _buildBorrowItem(
+                  _borrowSummary.activeBorrows[index],
+                ),
               ),
-            if (_myBorrows.length > 3)
+            if (_borrowSummary.activeBorrows.length > 3)
               Center(
                 child: TextButton(
                   onPressed: () {
                     _showAllBorrowsDialog();
                   },
-                  child: Text('查看全部 ${_myBorrows.length} 本'),
+                  child: Text(
+                    '查看全部 ${_borrowSummary.activeBorrows.length} 本',
+                  ),
                 ),
               ),
           ],
@@ -511,8 +501,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                       isOverdue
                           ? '已逾期 ${-daysLeft} 天'
                           : daysLeft > 0
-                          ? '剩余 $daysLeft 天'
-                          : '今日到期',
+                              ? '剩余 $daysLeft 天'
+                              : '今日到期',
                       style: TextStyle(
                         fontSize: 12,
                         color: isOverdue ? Colors.red : Colors.orange,
@@ -735,9 +725,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                 const Divider(),
                 Expanded(
                   child: ListView.builder(
-                    itemCount: _myBorrows.length,
+                    itemCount: _borrowSummary.activeBorrows.length,
                     itemBuilder: (context, index) {
-                      return _buildBorrowItem(_myBorrows[index]);
+                      return _buildBorrowItem(
+                        _borrowSummary.activeBorrows[index],
+                      );
                     },
                   ),
                 ),

@@ -1,36 +1,36 @@
-import 'dart:math';
-
-import 'package:pocketbase/pocketbase.dart';
-
 import '../models/profile.dart';
-import 'backend/pb_mapper.dart';
-import 'backend/pocketbase_client.dart';
+import 'app_exception.dart';
+import 'auth/auth_session.dart';
+import 'auth/profile_repository.dart';
 
 /// 全局认证和用户状态管理服务
 class AuthService {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
-  AuthService._internal();
+  AuthService._internal()
+      : _session = AuthSession(),
+        _profiles = ProfileRepository();
 
+  final AuthSession _session;
+  final ProfileRepository _profiles;
   Profile? _currentProfile;
   String? _currentProfileUserId;
   Future<void>? _initializingUserState;
 
   Profile? get currentProfile => _currentProfile;
 
-  String? get currentUserId =>
-      pb.authStore.record?.get<String?>('source_id') ?? pb.authStore.record?.id;
+  String? get currentUserId => _session.currentUserId;
 
-  String? get currentUserEmail => pb.authStore.record?.get<String?>('email');
+  String? get currentUserEmail => _session.currentUserEmail;
 
-  bool get isLoggedIn => pb.authStore.isValid;
+  bool get isLoggedIn => _session.isLoggedIn;
 
   bool get isAdmin => _currentProfile?.isAdmin ?? false;
 
   bool get isTeacher => _currentProfile?.isTeacher ?? true;
 
   Stream<bool> get authStateChanges {
-    return pb.authStore.onChange.map((_) => pb.authStore.isValid).distinct();
+    return _session.authStateChanges;
   }
 
   Future<void> initializeUserState() async {
@@ -60,9 +60,9 @@ class AuthService {
 
   Future<void> _initializeUserState(String userId) async {
     try {
-      await pb.collection('profiles').authRefresh();
+      await _profiles.refreshAuth();
     } catch (_) {
-      pb.authStore.clear();
+      _session.clear();
       _currentProfile = null;
       _currentProfileUserId = null;
       return;
@@ -72,7 +72,7 @@ class AuthService {
   }
 
   Future<void> signIn({required String email, required String password}) async {
-    await pb.collection('profiles').authWithPassword(email, password);
+    await _profiles.signIn(email: email, password: password);
     await initializeUserState();
   }
 
@@ -81,32 +81,21 @@ class AuthService {
     required String password,
     required String fullName,
   }) async {
-    final profileId = _newProfileRecordId();
-    await pb.collection('profiles').create(
-      body: {
-        'id': profileId,
-        'source_id': profileId,
-        'email': email,
-        'password': password,
-        'passwordConfirm': password,
-        'full_name': fullName,
-        'role': 'teacher',
-        'emailVisibility': true,
-        'verified': true,
-      },
+    await _profiles.createTeacherProfile(
+      email: email,
+      password: password,
+      fullName: fullName,
     );
     await signIn(email: email, password: password);
   }
 
   Future<void> signOut() async {
-    pb.authStore.clear();
+    _session.clear();
     onUserLoggedOut();
   }
 
   Future<Profile?> getUserProfileById(String userId) async {
-    final record = await findProfileBySourceId(userId) ??
-        await pb.collection('profiles').getOne(userId);
-    return _profileFromRecord(record);
+    return _profiles.getProfileByUserId(userId);
   }
 
   Future<void> _loadUserProfile(String userId) async {
@@ -145,13 +134,14 @@ class AuthService {
     if (updates.isEmpty) return;
 
     try {
-      final record = await findProfileBySourceId(currentUserId!);
-      await pb
-          .collection('profiles')
-          .update(record?.id ?? currentUserId!, body: updates);
+      await _profiles.updateProfile(
+        currentUserId!,
+        fullName: fullName,
+        role: role,
+      );
       await refreshCurrentProfile();
     } catch (e) {
-      throw Exception('更新用户资料失败: $e');
+      throwServiceException('更新用户资料失败', e);
     }
   }
 
@@ -161,14 +151,10 @@ class AuthService {
   }) async {
     if (currentUserId == null) return;
 
-    final record = await findProfileBySourceId(currentUserId!);
-    await pb.collection('profiles').update(
-      record?.id ?? currentUserId!,
-      body: {
-        'oldPassword': oldPassword,
-        'password': newPassword,
-        'passwordConfirm': newPassword,
-      },
+    await _profiles.updatePassword(
+      userId: currentUserId!,
+      oldPassword: oldPassword,
+      newPassword: newPassword,
     );
   }
 
@@ -191,21 +177,5 @@ class AuthService {
       default:
         return '未知角色';
     }
-  }
-
-  Profile _profileFromRecord(RecordModel record) {
-    return Profile.fromJson({
-      'id': record.get<String?>('source_id') ?? record.id,
-      'full_name': record.get<String?>('full_name'),
-      'role': record.get<String?>('role') ?? 'teacher',
-      'updated_at':
-          record.get<String?>('updated_at') ?? record.get<String?>('updated'),
-    });
-  }
-
-  String _newProfileRecordId() {
-    final timestamp = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
-    final random = Random.secure().nextInt(1 << 32).toRadixString(36);
-    return '$timestamp$random'.padRight(15, '0').substring(0, 15);
   }
 }

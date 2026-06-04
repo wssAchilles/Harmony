@@ -1,8 +1,4 @@
-import 'dart:async';
-
 import 'package:pocketbase/pocketbase.dart';
-
-import 'pocketbase_client.dart';
 
 Map<String, dynamic> recordToJson(RecordModel record) {
   final data = Map<String, dynamic>.from(record.toJson());
@@ -59,50 +55,4 @@ int? _numericIdFromRecordId(String id) {
     return int.tryParse(id);
   }
   return null;
-}
-
-Future<int> nextNumericId(String collectionName) async {
-  final records = await pb.collection(collectionName).getFullList(fields: 'id');
-  var maxId = 0;
-  for (final record in records) {
-    final id = _numericIdFromRecordId(record.id);
-    if (id != null && id > maxId) maxId = id;
-  }
-  return maxId + 1;
-}
-
-Future<RecordModel?> findByNumericId(String collectionName, int id) async {
-  try {
-    return await pb.collection(collectionName).getOne(numericRecordId(id));
-  } on ClientException catch (error) {
-    if (error.statusCode == 404) return null;
-    rethrow;
-  }
-}
-
-Future<String> requireRecordIdByNumericId(String collectionName, int id) async {
-  final record = await findByNumericId(collectionName, id);
-  if (record == null) {
-    throw Exception('$collectionName 记录不存在: $id');
-  }
-  return record.id;
-}
-
-Future<RecordModel?> findProfileBySourceId(String sourceId) async {
-  try {
-    return await pb
-        .collection('profiles')
-        .getFirstListItem('source_id = "${escapeFilterValue(sourceId)}"');
-  } on ClientException catch (error) {
-    if (error.statusCode == 404) return null;
-    rethrow;
-  }
-}
-
-Stream<List<T>> pollingListStream<T>(
-  Future<List<T>> Function() loader, {
-  Duration interval = const Duration(seconds: 30),
-}) async* {
-  yield await loader();
-  yield* Stream.periodic(interval).asyncMap((_) => loader());
 }

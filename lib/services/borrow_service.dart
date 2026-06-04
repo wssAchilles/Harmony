@@ -3,15 +3,21 @@ import 'package:pocketbase/pocketbase.dart';
 import '../models/book.dart';
 import '../models/borrow_record.dart';
 import '../models/student.dart';
+import 'app_exception.dart';
 import 'auth_service.dart';
+import 'backend/backend_gateway.dart';
 import 'backend/pb_mapper.dart';
-import 'backend/pocketbase_client.dart';
 
 /// 借阅服务层
 class BorrowService {
   static final BorrowService _instance = BorrowService._internal();
   factory BorrowService() => _instance;
-  BorrowService._internal();
+  BorrowService._internal({BackendGateway? backend})
+      : _backend = backend ?? backendGateway;
+
+  BorrowService.withBackend(BackendGateway backend) : _backend = backend;
+
+  final BackendGateway _backend;
 
   Future<void> borrowBookToStudent({
     required Book book,
@@ -20,7 +26,7 @@ class BorrowService {
     int borrowDays = 14,
   }) async {
     if (student.id == null) {
-      throw Exception('学生ID不能为空');
+      throw const InvalidRequestException('学生ID不能为空');
     }
     await _borrowBook(
       book: book,
@@ -51,28 +57,32 @@ class BorrowService {
     String? profileId,
   }) async {
     if (quantity <= 0) {
-      throw Exception('借阅数量必须大于0');
+      throw const InvalidBorrowQuantityException();
     }
 
     final currentUserId = AuthService().currentUserId;
     if (currentUserId == null) {
-      throw Exception('用户未登录');
+      throw const UnauthenticatedException();
     }
 
-    final bookRecord = await findByNumericId('books', book.id!);
+    final bookRecord = await _backend.findByNumericId('books', book.id!);
     if (bookRecord == null) {
-      throw Exception('图书不存在');
+      throw RecordNotFoundException('books', book.id!);
     }
 
     final available = asInt(bookRecord.get('available_quantity'));
     if (available < quantity) {
-      throw Exception('库存不足，当前可借数量：$available，需要数量：$quantity');
+      throw InsufficientStockException(
+        available: available,
+        requested: quantity,
+      );
     }
 
     final now = DateTime.now();
-    await pb.collection('books').update(
+    await _backend.update(
+      'books',
       bookRecord.id,
-      body: {
+      {
         'available_quantity': available - quantity,
         'last_updated_by': currentUserId,
         'status': available - quantity > 0 ? 'available' : 'borrowed',
@@ -80,9 +90,10 @@ class BorrowService {
     );
 
     try {
-      await pb.collection('borrow_records').create(
-        body: {
-          'id': numericRecordId(await nextNumericId('borrow_records')),
+      await _backend.create(
+        'borrow_records',
+        {
+          'id': numericRecordId(await _backend.nextNumericId('borrow_records')),
           'created_at': now.toUtc().toIso8601String(),
           'book_id': book.id,
           'student_id': studentId,
@@ -96,9 +107,10 @@ class BorrowService {
         },
       );
     } catch (e) {
-      await pb.collection('books').update(
+      await _backend.update(
+        'books',
         bookRecord.id,
-        body: {
+        {
           'available_quantity': available,
           'last_updated_by': currentUserId,
           'status': book.status,
@@ -112,22 +124,22 @@ class BorrowService {
     try {
       final currentUserId = AuthService().currentUserId;
       if (currentUserId == null) {
-        throw Exception('用户未登录');
+        throw const UnauthenticatedException();
       }
 
-      final record = await findByNumericId('borrow_records', recordId);
+      final record = await _backend.findByNumericId('borrow_records', recordId);
       if (record == null) {
-        throw Exception('借阅记录不存在');
+        throw RecordNotFoundException('borrow_records', recordId);
       }
 
       if (asNullableDate(record.get('return_date')) != null) {
-        throw Exception('该图书已经归还');
+        throw const BorrowRecordAlreadyReturnedException();
       }
 
       final bookId = asInt(record.get('book_id'));
-      final bookRecord = await findByNumericId('books', bookId);
+      final bookRecord = await _backend.findByNumericId('books', bookId);
       if (bookRecord == null) {
-        throw Exception('图书不存在');
+        throw RecordNotFoundException('books', bookId);
       }
 
       final currentAvailable = asInt(bookRecord.get('available_quantity'));
@@ -138,14 +150,16 @@ class BorrowService {
         totalQuantity,
       );
 
-      await pb.collection('borrow_records').update(
+      await _backend.update(
+        'borrow_records',
         record.id,
-        body: {'return_date': dateForPocketBase(DateTime.now())},
+        {'return_date': dateForPocketBase(DateTime.now())},
       );
 
-      await pb.collection('books').update(
+      await _backend.update(
+        'books',
         bookRecord.id,
-        body: {
+        {
           'available_quantity': nextAvailable,
           'last_updated_by': currentUserId,
           'status': nextAvailable > 0 ? 'available' : 'borrowed',
@@ -205,7 +219,7 @@ class BorrowService {
   }
 
   Stream<List<BorrowRecord>> getActiveBorrowsStream() {
-    return pollingListStream(() {
+    return _backend.pollingListStream(() {
       return _loadBorrowRecords(filter: 'return_date = null', sort: 'due_date');
     });
   }
@@ -232,16 +246,18 @@ class BorrowService {
     }
 
     try {
-      final recordId = await requireRecordIdByNumericId(
+      final recordId = await _backend.requireRecordIdByNumericId(
         'borrow_records',
         record.id,
       );
       final newDueDate = record.dueDate?.add(Duration(days: extraDays)) ??
           DateTime.now().add(Duration(days: extraDays));
 
-      await pb
-          .collection('borrow_records')
-          .update(recordId, body: {'due_date': dateForPocketBase(newDueDate)});
+      await _backend.update(
+        'borrow_records',
+        recordId,
+        {'due_date': dateForPocketBase(newDueDate)},
+      );
     } catch (e) {
       print('续借失败: $e');
       rethrow;
@@ -289,16 +305,22 @@ class BorrowService {
     String? filter,
     String? sort,
   }) async {
-    final records = await pb
-        .collection('borrow_records')
-        .getFullList(filter: filter, sort: sort);
+    final records = await _backend.getFullList(
+      'borrow_records',
+      filter: filter,
+      sort: sort,
+    );
     return Future.wait(records.map(_borrowRecordFromRecord));
   }
 
   Future<RecordModel?> _firstBorrowRecord(String filter) async {
-    final result = await pb
-        .collection('borrow_records')
-        .getList(page: 1, perPage: 1, filter: filter, sort: '-borrow_date');
+    final result = await _backend.getList(
+      'borrow_records',
+      page: 1,
+      perPage: 1,
+      filter: filter,
+      sort: '-borrow_date',
+    );
     return result.items.isEmpty ? null : result.items.first;
   }
 
@@ -338,12 +360,12 @@ class BorrowService {
   }
 
   Future<Book?> _findBook(int id) async {
-    final record = await findByNumericId('books', id);
+    final record = await _backend.findByNumericId('books', id);
     return record == null ? null : Book.fromJson(recordToJson(record));
   }
 
   Future<Student?> _findStudent(int id) async {
-    final record = await findByNumericId('students', id);
+    final record = await _backend.findByNumericId('students', id);
     return record == null ? null : Student.fromJson(recordToJson(record));
   }
 

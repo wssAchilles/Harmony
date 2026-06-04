@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/dashboard_data.dart';
 import '../services/dashboard_service.dart';
 import 'package:intl/intl.dart';
 
@@ -11,7 +12,7 @@ class OverdueRecordsScreen extends StatefulWidget {
 
 class _OverdueRecordsScreenState extends State<OverdueRecordsScreen> {
   final DashboardService _dashboardService = DashboardService();
-  List<Map<String, dynamic>> _overdueRecords = [];
+  List<OverdueBorrowRecordView> _overdueRecords = [];
   bool _isLoading = true;
 
   @override
@@ -37,10 +38,9 @@ class _OverdueRecordsScreenState extends State<OverdueRecordsScreen> {
     }
   }
 
-  int _calculateOverdueDays(String dueDate) {
-    final due = DateTime.parse(dueDate);
+  int _calculateOverdueDays(DateTime dueDate) {
     final now = DateTime.now();
-    return now.difference(due).inDays;
+    return now.difference(dueDate).inDays;
   }
 
   @override
@@ -104,20 +104,11 @@ class _OverdueRecordsScreenState extends State<OverdueRecordsScreen> {
     );
   }
 
-  Widget _buildOverdueCard(Map<String, dynamic> record) {
-    final overdueDays = _calculateOverdueDays(record['due_date']);
-    final bookInfo = record['books'] as Map<String, dynamic>;
-    final studentInfo = record['students'] as Map<String, dynamic>?;
-    final borrowerProfile = record['borrower_profile'] as Map<String, dynamic>?;
-    final borrowerName = studentInfo?['full_name'] ??
-        borrowerProfile?['full_name'] ??
-        record['borrower_name'] ??
-        '未知借阅人';
-    final borrowerType = studentInfo != null
-        ? '学生'
-        : borrowerProfile != null
-            ? '老师'
-            : record['borrower_type'] ?? '未知';
+  Widget _buildOverdueCard(OverdueBorrowRecordView record) {
+    final dueDate = record.dueDate ?? DateTime.now();
+    final overdueDays = _calculateOverdueDays(dueDate);
+    final borrowerName = record.borrowerName;
+    final borrowerType = record.borrowerType;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -161,7 +152,7 @@ class _OverdueRecordsScreenState extends State<OverdueRecordsScreen> {
                   ),
                 ),
                 Text(
-                  '借阅编号: ${record['id']}',
+                  '借阅编号: ${record.id}',
                   style: TextStyle(color: Colors.grey[600], fontSize: 12),
                 ),
               ],
@@ -179,14 +170,14 @@ class _OverdueRecordsScreenState extends State<OverdueRecordsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        bookInfo['title'] ?? '未知书名',
+                        record.bookTitle ?? '未知书名',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        '作者: ${bookInfo['author'] ?? '未知'}',
+                        '作者: ${record.bookAuthor ?? '未知'}',
                         style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                       ),
                     ],
@@ -204,8 +195,8 @@ class _OverdueRecordsScreenState extends State<OverdueRecordsScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    studentInfo != null
-                        ? '$borrowerName - ${studentInfo['class_name'] ?? '未分配班级'}'
+                    record.studentId != null
+                        ? '$borrowerName - 未分配班级'
                         : '$borrowerName ($borrowerType)',
                     style: const TextStyle(fontSize: 14),
                   ),
@@ -229,14 +220,14 @@ class _OverdueRecordsScreenState extends State<OverdueRecordsScreen> {
                     '借阅日期',
                     DateFormat(
                       'yyyy-MM-dd',
-                    ).format(DateTime.parse(record['borrow_date'])),
+                    ).format(record.borrowDate),
                   ),
                   Container(width: 1, height: 30, color: Colors.grey[300]),
                   _buildDateInfo(
                     '应还日期',
                     DateFormat(
                       'yyyy-MM-dd',
-                    ).format(DateTime.parse(record['due_date'])),
+                    ).format(dueDate),
                     isOverdue: true,
                   ),
                 ],

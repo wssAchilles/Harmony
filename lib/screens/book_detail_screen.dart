@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import '../models/book.dart';
 import '../models/student.dart';
 import '../models/borrow_record.dart';
+import '../services/app_exception.dart';
 import '../services/book_service.dart';
 import '../services/student_service.dart';
 import '../services/borrow_service.dart';
 import 'add_edit_book_screen.dart';
+import 'borrow_quantity_dialog.dart';
 
 /// 图书详情页面
 class BookDetailScreen extends StatefulWidget {
@@ -166,112 +168,21 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
 
   /// 借书给学生
   Future<void> _borrowToStudent(Student student) async {
-    int selectedQuantity = 1;
-
-    final result = await showDialog<Map<String, dynamic>>(
+    final result = await showDialog<BorrowQuantityResult>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('确认借阅'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('将《${_currentBook.title}》借给${student.fullName}'),
-              const SizedBox(height: 8),
-              Text(
-                '班级：${student.className}',
-                style: TextStyle(color: Colors.grey[600]),
-              ),
-              Text('借阅期限：14天', style: TextStyle(color: Colors.grey[600])),
-              const SizedBox(height: 16),
-
-              // 数量选择器
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      '借阅数量：',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // 减少按钮
-                  IconButton(
-                    constraints: const BoxConstraints(
-                      minWidth: 36,
-                      minHeight: 36,
-                    ),
-                    padding: EdgeInsets.zero,
-                    onPressed: selectedQuantity > 1
-                        ? () => setState(() => selectedQuantity--)
-                        : null,
-                    icon: const Icon(Icons.remove, size: 20),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.grey[200],
-                      foregroundColor: Colors.grey[700],
-                    ),
-                  ),
-                  // 数量显示
-                  Container(
-                    width: 40,
-                    alignment: Alignment.center,
-                    child: Text(
-                      '$selectedQuantity',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  // 增加按钮
-                  IconButton(
-                    constraints: const BoxConstraints(
-                      minWidth: 36,
-                      minHeight: 36,
-                    ),
-                    padding: EdgeInsets.zero,
-                    onPressed: selectedQuantity < _currentBook.availableQuantity
-                        ? () => setState(() => selectedQuantity++)
-                        : null,
-                    icon: const Icon(Icons.add, size: 20),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.blue[100],
-                      foregroundColor: Colors.blue[700],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Flexible(
-                child: Text(
-                  '可借数量：${_currentBook.availableQuantity} 本',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, null),
-              child: const Text('取消'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, {
-                'confirmed': true,
-                'quantity': selectedQuantity,
-              }),
-              child: const Text('确认借出'),
-            ),
-          ],
-        ),
+      builder: (context) => BorrowQuantityDialog(
+        title: '确认借阅',
+        description: '将《${_currentBook.title}》借给${student.fullName}',
+        details: [
+          '班级：${student.className ?? '未分配班级'}',
+          '借阅期限：14天',
+        ],
+        availableQuantity: _currentBook.availableQuantity,
+        confirmLabel: '确认借出',
       ),
     );
 
-    if (result == null || result['confirmed'] != true) return;
+    if (result == null) return;
 
     setState(() => _isLoading = true);
 
@@ -279,7 +190,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       await _borrowService.borrowBookToStudent(
         book: _currentBook,
         student: student,
-        quantity: result['quantity'] as int,
+        quantity: result.quantity,
       );
 
       if (mounted) {
@@ -296,7 +207,10 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('借阅失败: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('借阅失败: ${messageForError(e)}'),
+            backgroundColor: Colors.red,
+          ),
         );
         setState(() => _isLoading = false);
       }
@@ -305,115 +219,25 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
 
   /// 老师自己借阅
   Future<void> _borrowToTeacher() async {
-    int selectedQuantity = 1;
-
-    final result = await showDialog<Map<String, dynamic>>(
+    final result = await showDialog<BorrowQuantityResult>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('确认借阅'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('确定要借阅《${_currentBook.title}》吗？'),
-              const SizedBox(height: 8),
-              Text('借阅期限：30天', style: TextStyle(color: Colors.grey[600])),
-              const SizedBox(height: 16),
-
-              // 数量选择器
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      '借阅数量：',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // 减少按钮
-                  IconButton(
-                    constraints: const BoxConstraints(
-                      minWidth: 36,
-                      minHeight: 36,
-                    ),
-                    padding: EdgeInsets.zero,
-                    onPressed: selectedQuantity > 1
-                        ? () => setState(() => selectedQuantity--)
-                        : null,
-                    icon: const Icon(Icons.remove, size: 20),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.grey[200],
-                      foregroundColor: Colors.grey[700],
-                    ),
-                  ),
-                  // 数量显示
-                  Container(
-                    width: 40,
-                    alignment: Alignment.center,
-                    child: Text(
-                      '$selectedQuantity',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  // 增加按钮
-                  IconButton(
-                    constraints: const BoxConstraints(
-                      minWidth: 36,
-                      minHeight: 36,
-                    ),
-                    padding: EdgeInsets.zero,
-                    onPressed: selectedQuantity < _currentBook.availableQuantity
-                        ? () => setState(() => selectedQuantity++)
-                        : null,
-                    icon: const Icon(Icons.add, size: 20),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.blue[100],
-                      foregroundColor: Colors.blue[700],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Flexible(
-                child: Text(
-                  '可借数量：${_currentBook.availableQuantity} 本',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, null),
-              child: const Text('取消'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, {
-                'confirmed': true,
-                'quantity': selectedQuantity,
-              }),
-              child: const Text('确认借阅'),
-            ),
-          ],
-        ),
+      builder: (context) => BorrowQuantityDialog(
+        title: '确认借阅',
+        description: '确定要借阅《${_currentBook.title}》吗？',
+        details: const ['借阅期限：30天'],
+        availableQuantity: _currentBook.availableQuantity,
+        confirmLabel: '确认借阅',
       ),
     );
 
-    if (result == null || result['confirmed'] != true) return;
+    if (result == null) return;
 
     setState(() => _isLoading = true);
 
     try {
       await _borrowService.borrowBookToTeacher(
         book: _currentBook,
-        quantity: result['quantity'] as int,
+        quantity: result.quantity,
       );
 
       if (mounted) {
@@ -427,7 +251,10 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('借阅失败: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('借阅失败: ${messageForError(e)}'),
+            backgroundColor: Colors.red,
+          ),
         );
         setState(() => _isLoading = false);
       }
@@ -494,7 +321,10 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('归还失败: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('归还失败: ${messageForError(e)}'),
+            backgroundColor: Colors.red,
+          ),
         );
         setState(() => _isLoading = false);
       }

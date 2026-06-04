@@ -2,10 +2,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/book.dart';
+import '../services/app_exception.dart';
 import '../services/book_service.dart';
 import '../models/category.dart';
 import '../services/category_service.dart';
 import '../config/backend_config.dart';
+import 'book_form_controller.dart';
 
 /// 添加/编辑图书页面
 class AddEditBookScreen extends StatefulWidget {
@@ -21,12 +23,7 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
   final _formKey = GlobalKey<FormState>();
   final _bookService = BookService();
   final _categoryService = CategoryService();
-  final _titleController = TextEditingController();
-  final _authorController = TextEditingController();
-  final _locationController = TextEditingController();
-  final _quantityController = TextEditingController(text: '1'); // 数量控制器，默认为1
-  final _totalQuantityController = TextEditingController(); // 总库存控制器
-  final _availableQuantityController = TextEditingController(); // 在馆数量控制器
+  late final BookFormController _form;
 
   bool _isLoading = false;
   File? _selectedImage; // 新选择的图片文件
@@ -41,15 +38,10 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
   @override
   void initState() {
     super.initState();
+    _form = BookFormController(initialBook: widget.book);
     _loadCategories();
     // 如果是编辑模式，填充现有数据
     if (widget.book != null) {
-      _titleController.text = widget.book!.title;
-      _authorController.text = widget.book!.author ?? '';
-      _locationController.text = widget.book!.location ?? '';
-      _totalQuantityController.text = widget.book!.totalQuantity.toString();
-      _availableQuantityController.text =
-          widget.book!.availableQuantity.toString();
       _existingImageUrl = widget.book!.coverImageUrl;
     }
   }
@@ -78,12 +70,7 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
 
   @override
   void dispose() {
-    _titleController.dispose();
-    _authorController.dispose();
-    _locationController.dispose();
-    _quantityController.dispose();
-    _totalQuantityController.dispose();
-    _availableQuantityController.dispose();
+    _form.dispose();
     super.dispose();
   }
 
@@ -106,7 +93,9 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('选择图片失败: $e')));
+        ).showSnackBar(
+          SnackBar(content: Text('选择图片失败: ${messageForError(e)}')),
+        );
       }
     }
   }
@@ -209,7 +198,10 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('删除失败: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('删除失败: ${messageForError(e)}'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -240,29 +232,15 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
         );
       }
 
-      // 创建或更新图书对象
-      final book = Book(
-        id: widget.book?.id,
-        title: _titleController.text.trim(),
-        author: _authorController.text.trim(),
-        location: _locationController.text.trim(),
+      final book = _form.buildBook(
         coverImageUrl: coverImageUrl,
-        categoryId: _selectedCategory?.id, // 添加分类ID
-        categoryName: _selectedCategory?.name, // 添加分类名称
-        totalQuantity: widget.book != null
-            ? int.tryParse(_totalQuantityController.text) ??
-                widget.book!.totalQuantity
-            : int.tryParse(_quantityController.text) ?? 1,
-        availableQuantity: widget.book != null
-            ? int.tryParse(_availableQuantityController.text) ??
-                widget.book!.availableQuantity
-            : int.tryParse(_quantityController.text) ?? 1,
+        selectedCategory: _selectedCategory,
       );
 
       // 根据是新增还是编辑调用不同的方法
       if (widget.book == null) {
         // 新增时使用输入的数量
-        final quantity = int.tryParse(_quantityController.text) ?? 1;
+        final quantity = _form.addQuantity;
         await _bookService.addBook(book, quantity: quantity);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -286,7 +264,9 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('保存失败: $e')));
+        ).showSnackBar(
+          SnackBar(content: Text('保存失败: ${messageForError(e)}')),
+        );
       }
     } finally {
       if (mounted) {
@@ -333,57 +313,42 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
 
               // 书名输入框
               TextFormField(
-                controller: _titleController,
+                controller: _form.titleController,
                 decoration: const InputDecoration(
                   labelText: '书名 *',
                   hintText: '请输入图书名称',
                   prefixIcon: Icon(Icons.book),
                   border: OutlineInputBorder(),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return '书名不能为空';
-                  }
-                  return null;
-                },
+                validator: (value) => _form.validateRequired(value, '书名'),
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 16),
 
               // 作者输入框
               TextFormField(
-                controller: _authorController,
+                controller: _form.authorController,
                 decoration: const InputDecoration(
                   labelText: '作者 *',
                   hintText: '请输入作者姓名',
                   prefixIcon: Icon(Icons.person),
                   border: OutlineInputBorder(),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return '作者不能为空';
-                  }
-                  return null;
-                },
+                validator: (value) => _form.validateRequired(value, '作者'),
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 16),
 
               // 存放位置输入框
               TextFormField(
-                controller: _locationController,
+                controller: _form.locationController,
                 decoration: const InputDecoration(
                   labelText: '存放位置 *',
                   hintText: '例如：A架3层',
                   prefixIcon: Icon(Icons.location_on),
                   border: OutlineInputBorder(),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return '存放位置不能为空';
-                  }
-                  return null;
-                },
+                validator: (value) => _form.validateRequired(value, '存放位置'),
                 textInputAction:
                     isEditMode ? TextInputAction.done : TextInputAction.next,
                 onFieldSubmitted: isEditMode ? (_) => _saveBook() : null,
@@ -393,7 +358,7 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
               // 数量输入框（仅在添加模式显示）
               if (!isEditMode) ...[
                 TextFormField(
-                  controller: _quantityController,
+                  controller: _form.quantityController,
                   decoration: const InputDecoration(
                     labelText: '采购数量 *',
                     hintText: '请输入图书数量',
@@ -402,19 +367,7 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
                     helperText: '请输入本次采购的图书数量',
                   ),
                   keyboardType: TextInputType.number,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return '数量不能为空';
-                    }
-                    final quantity = int.tryParse(value.trim());
-                    if (quantity == null || quantity < 1) {
-                      return '请输入有效的数量（至少1本）';
-                    }
-                    if (quantity > 999) {
-                      return '数量不能超过999';
-                    }
-                    return null;
-                  },
+                  validator: _form.validateAddQuantity,
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _saveBook(),
                 ),
@@ -513,7 +466,7 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
                         const SizedBox(height: 16),
                         // 总库存输入框
                         TextFormField(
-                          controller: _totalQuantityController,
+                          controller: _form.totalQuantityController,
                           decoration: InputDecoration(
                             labelText: '总库存 *',
                             hintText: '请输入图书总数量',
@@ -522,32 +475,13 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
                             helperText: '图书馆中该书目的总数量（包含已借出和在馆的）',
                           ),
                           keyboardType: TextInputType.number,
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return '总库存不能为空';
-                            }
-                            final totalQuantity = int.tryParse(value.trim());
-                            if (totalQuantity == null || totalQuantity < 1) {
-                              return '请输入有效的总数量（至少1本）';
-                            }
-                            if (totalQuantity > 9999) {
-                              return '总数量不能超过9999';
-                            }
-                            final availableQuantity = int.tryParse(
-                                  _availableQuantityController.text.trim(),
-                                ) ??
-                                0;
-                            if (totalQuantity < availableQuantity) {
-                              return '总库存不能小于在馆数量';
-                            }
-                            return null;
-                          },
+                          validator: _form.validateTotalQuantity,
                           textInputAction: TextInputAction.next,
                         ),
                         const SizedBox(height: 16),
                         // 在馆数量输入框
                         TextFormField(
-                          controller: _availableQuantityController,
+                          controller: _form.availableQuantityController,
                           decoration: InputDecoration(
                             labelText: '在馆数量 *',
                             hintText: '请输入当前在馆可借数量',
@@ -556,26 +490,7 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
                             helperText: '当前在馆可供借阅的数量，用于纠正库存差错',
                           ),
                           keyboardType: TextInputType.number,
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return '在馆数量不能为空';
-                            }
-                            final availableQuantity = int.tryParse(
-                              value.trim(),
-                            );
-                            if (availableQuantity == null ||
-                                availableQuantity < 0) {
-                              return '请输入有效的在馆数量（不能为负数）';
-                            }
-                            final totalQuantity = int.tryParse(
-                                  _totalQuantityController.text.trim(),
-                                ) ??
-                                0;
-                            if (availableQuantity > totalQuantity) {
-                              return '在馆数量不能大于总库存';
-                            }
-                            return null;
-                          },
+                          validator: _form.validateAvailableQuantity,
                           textInputAction: TextInputAction.done,
                           onFieldSubmitted: (_) => _saveBook(),
                         ),

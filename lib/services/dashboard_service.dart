@@ -1,5 +1,6 @@
 import '../models/book.dart';
 import '../models/borrow_record.dart';
+import '../models/dashboard_data.dart';
 import 'book_service.dart';
 import 'borrow_service.dart';
 import 'student_service.dart';
@@ -8,10 +9,10 @@ class DashboardService {
   final _bookService = BookService();
   final _borrowService = BorrowService();
   final _studentService = StudentService();
-  Map<String, dynamic>? _lastSummary;
-  List<Map<String, dynamic>>? _lastTopBooks;
-  List<Map<String, dynamic>>? _lastTopStudents;
-  List<Map<String, dynamic>>? _lastOverdueRecords;
+  DashboardSummary? _lastSummary;
+  List<TopBorrowedBook>? _lastTopBooks;
+  List<TopActiveStudent>? _lastTopStudents;
+  List<OverdueBorrowRecordView>? _lastOverdueRecords;
 
   Future<int> getCurrentBorrowedCount() async {
     try {
@@ -33,7 +34,7 @@ class DashboardService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getTopBorrowedBooks() async {
+  Future<List<TopBorrowedBook>> getTopBorrowedBooks() async {
     try {
       final firstDayOfMonth = DateTime(
         DateTime.now().year,
@@ -44,25 +45,36 @@ class DashboardService {
           .where((record) => record.borrowDate.isAfter(firstDayOfMonth))
           .toList();
 
-      final bookCount = <int, Map<String, dynamic>>{};
+      final bookCount = <int, _BookBorrowCount>{};
       for (final record in records) {
         final existing = bookCount[record.bookId];
         if (existing != null) {
-          existing['count'] = (existing['count'] as int) + record.quantity;
+          existing.count += record.quantity;
         } else {
-          bookCount[record.bookId] = {
-            'book_id': record.bookId,
-            'title': record.bookTitle,
-            'author': record.bookAuthor,
-            'cover_image_url': record.bookCoverImageUrl,
-            'count': record.quantity,
-          };
+          bookCount[record.bookId] = _BookBorrowCount(
+            bookId: record.bookId,
+            title: record.bookTitle,
+            author: record.bookAuthor,
+            coverImageUrl: record.bookCoverImageUrl,
+            count: record.quantity,
+          );
         }
       }
 
       final sortedBooks = bookCount.values.toList()
-        ..sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
-      final topBooks = sortedBooks.take(5).toList();
+        ..sort((a, b) => b.count.compareTo(a.count));
+      final topBooks = sortedBooks
+          .take(5)
+          .map(
+            (book) => TopBorrowedBook(
+              bookId: book.bookId,
+              title: book.title,
+              author: book.author,
+              coverImageUrl: book.coverImageUrl,
+              count: book.count,
+            ),
+          )
+          .toList();
       _lastTopBooks = topBooks;
       return topBooks;
     } catch (e) {
@@ -71,7 +83,7 @@ class DashboardService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getTopActiveStudents() async {
+  Future<List<TopActiveStudent>> getTopActiveStudents() async {
     try {
       final firstDayOfMonth = DateTime(
         DateTime.now().year,
@@ -83,26 +95,36 @@ class DashboardService {
           .where((record) => record.studentId != null)
           .toList();
 
-      final studentCount = <int, Map<String, dynamic>>{};
+      final studentCount = <int, _StudentBorrowCount>{};
       for (final record in records) {
         final studentId = record.studentId!;
         final existing = studentCount[studentId];
         if (existing != null) {
-          existing['count'] = (existing['count'] as int) + record.quantity;
+          existing.count += record.quantity;
         } else {
           final student = await _studentService.getStudentById(studentId);
-          studentCount[studentId] = {
-            'student_id': studentId,
-            'full_name': student?.fullName ?? record.studentName,
-            'class_name': student?.className,
-            'count': record.quantity,
-          };
+          studentCount[studentId] = _StudentBorrowCount(
+            studentId: studentId,
+            fullName: student?.fullName ?? record.studentName,
+            className: student?.className,
+            count: record.quantity,
+          );
         }
       }
 
       final sortedStudents = studentCount.values.toList()
-        ..sort((a, b) => (b['count'] as int).compareTo(a['count'] as int));
-      final topStudents = sortedStudents.take(5).toList();
+        ..sort((a, b) => b.count.compareTo(a.count));
+      final topStudents = sortedStudents
+          .take(5)
+          .map(
+            (student) => TopActiveStudent(
+              studentId: student.studentId,
+              fullName: student.fullName,
+              className: student.className,
+              count: student.count,
+            ),
+          )
+          .toList();
       _lastTopStudents = topStudents;
       return topStudents;
     } catch (e) {
@@ -111,32 +133,11 @@ class DashboardService {
     }
   }
 
-  Future<List<Map<String, dynamic>>> getOverdueRecords() async {
+  Future<List<OverdueBorrowRecordView>> getOverdueRecords() async {
     try {
       final records = await _borrowService.getOverdueRecords();
-      final overdueRecords = records
-          .map(
-            (record) => {
-              'id': record.id,
-              'borrow_date': record.borrowDate.toIso8601String(),
-              'due_date': record.dueDate?.toIso8601String(),
-              'book_id': record.bookId,
-              'student_id': record.studentId,
-              'books': {'title': record.bookTitle, 'author': record.bookAuthor},
-              'students': record.studentId == null
-                  ? null
-                  : {'full_name': record.studentName, 'class_name': null},
-              'borrower_profile': record.profileId == null
-                  ? null
-                  : {
-                      'full_name':
-                          record.borrowerTeacherName ?? record.teacherName,
-                    },
-              'borrower_name': record.borrowerName,
-              'borrower_type': record.borrowerType,
-            },
-          )
-          .toList();
+      final overdueRecords =
+          records.map(OverdueBorrowRecordView.fromBorrowRecord).toList();
       _lastOverdueRecords = overdueRecords;
       return overdueRecords;
     } catch (e) {
@@ -145,7 +146,7 @@ class DashboardService {
     }
   }
 
-  Future<Map<String, dynamic>> getDashboardSummary() async {
+  Future<DashboardSummary> getDashboardSummary() async {
     try {
       final books = await _bookService.getBooksWithCategories();
       final students = await _studentService.getAllStudents();
@@ -160,41 +161,64 @@ class DashboardService {
           .toList();
       final now = DateTime.now();
 
-      final summary = {
-        'total_books': books.fold<int>(
+      final summary = DashboardSummary(
+        totalBooks: books.fold<int>(
           0,
           (sum, Book book) => sum + book.totalQuantity,
         ),
-        'total_students': students.length,
-        'monthly_borrows': allRecords
+        totalStudents: students.length,
+        monthlyBorrows: allRecords
             .where(
               (BorrowRecord record) =>
                   record.borrowDate.isAfter(firstDayOfMonth),
             )
             .length,
-        'current_borrowed': activeRecords.fold<int>(
+        currentBorrowed: activeRecords.fold<int>(
           0,
           (sum, BorrowRecord record) => sum + record.quantity,
         ),
-        'overdue_count': activeRecords
+        overdueCount: activeRecords
             .where(
               (BorrowRecord record) =>
                   record.dueDate != null && record.dueDate!.isBefore(now),
             )
             .length,
-      };
+      );
       _lastSummary = summary;
       return summary;
     } catch (e) {
       print('获取统计摘要失败: $e');
-      return _lastSummary ??
-          {
-            'total_books': 0,
-            'total_students': 0,
-            'monthly_borrows': 0,
-            'current_borrowed': 0,
-            'overdue_count': 0,
-          };
+      return _lastSummary ?? const DashboardSummary.empty();
     }
   }
+}
+
+class _BookBorrowCount {
+  _BookBorrowCount({
+    required this.bookId,
+    required this.count,
+    this.title,
+    this.author,
+    this.coverImageUrl,
+  });
+
+  final int bookId;
+  final String? title;
+  final String? author;
+  final String? coverImageUrl;
+  int count;
+}
+
+class _StudentBorrowCount {
+  _StudentBorrowCount({
+    required this.studentId,
+    required this.count,
+    this.fullName,
+    this.className,
+  });
+
+  final int studentId;
+  final String? fullName;
+  final String? className;
+  int count;
 }

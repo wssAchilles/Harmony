@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/dashboard_data.dart';
 import '../services/dashboard_service.dart';
 import '../services/auth_service.dart';
 import '../screens/overdue_records_screen.dart';
@@ -21,9 +22,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
-  Map<String, dynamic> _summary = {};
-  List<Map<String, dynamic>> _topBooks = [];
-  List<Map<String, dynamic>> _topStudents = [];
+  DashboardSummary _summary = const DashboardSummary.empty();
+  List<TopBorrowedBook> _topBooks = [];
+  List<TopActiveStudent> _topStudents = [];
   bool _isLoading = true;
 
   @override
@@ -117,33 +118,33 @@ class _DashboardScreenState extends State<DashboardScreen>
                       sliver: SliverGrid(
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              childAspectRatio: 2.2,
-                              crossAxisSpacing: 16,
-                              mainAxisSpacing: 16,
-                            ),
+                          crossAxisCount: 2,
+                          childAspectRatio: 2.2,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                        ),
                         delegate: SliverChildListDelegate([
                           _buildStatCard(
                             title: '图书总数',
-                            value: '${_summary['total_books'] ?? 0}',
+                            value: '${_summary.totalBooks}',
                             icon: Icons.menu_book,
                             color: Colors.blue,
                           ),
                           _buildStatCard(
                             title: '学生总数',
-                            value: '${_summary['total_students'] ?? 0}',
+                            value: '${_summary.totalStudents}',
                             icon: Icons.people,
                             color: Colors.green,
                           ),
                           _buildStatCard(
                             title: '当前在借',
-                            value: '${_summary['current_borrowed'] ?? 0}',
+                            value: '${_summary.currentBorrowed}',
                             icon: Icons.book_outlined,
                             color: Colors.orange,
                           ),
                           _buildStatCard(
                             title: '逾期未还',
-                            value: '${_summary['overdue_count'] ?? 0}',
+                            value: '${_summary.overdueCount}',
                             icon: Icons.warning,
                             color: Colors.red,
                             onTap: () {
@@ -174,7 +175,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                         child: _buildRankingCard(
                           title: '🔥 本月热门图书',
                           items: _topBooks,
-                          isBook: true,
+                          titleFor: (book) => book.title ?? '',
+                          subtitleFor: (book) => book.author ?? '未知作者',
+                          countFor: (book) => book.count,
                         ),
                       ),
                     ),
@@ -186,7 +189,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                         child: _buildRankingCard(
                           title: '⭐ 本月借阅之星',
                           items: _topStudents,
-                          isBook: false,
+                          titleFor: (student) => student.fullName ?? '',
+                          subtitleFor: (student) =>
+                              student.className ?? '未分配班级',
+                          countFor: (student) => student.count,
                         ),
                       ),
                     ),
@@ -334,7 +340,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${_summary['monthly_borrows'] ?? 0} 次借阅',
+                    '${_summary.monthlyBorrows} 次借阅',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 24,
@@ -357,10 +363,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _buildRankingCard({
+  Widget _buildRankingCard<T>({
     required String title,
-    required List<Map<String, dynamic>> items,
-    required bool isBook,
+    required List<T> items,
+    required String Function(T item) titleFor,
+    required String Function(T item) subtitleFor,
+    required int Function(T item) countFor,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -410,8 +418,9 @@ class _DashboardScreenState extends State<DashboardScreen>
               final item = entry.value;
               return _buildRankingItem(
                 rank: index + 1,
-                item: item,
-                isBook: isBook,
+                title: titleFor(item),
+                subtitle: subtitleFor(item),
+                count: countFor(item),
               );
             }).toList(),
           const SizedBox(height: 8),
@@ -422,8 +431,9 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _buildRankingItem({
     required int rank,
-    required Map<String, dynamic> item,
-    required bool isBook,
+    required String title,
+    required String subtitle,
+    required int count,
   }) {
     final medalColors = [Colors.amber, Colors.grey[400]!, Colors.orange[800]!];
     final showMedal = rank <= 3;
@@ -464,7 +474,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isBook ? item['title'] ?? '' : item['full_name'] ?? '',
+                  title,
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 15,
@@ -474,9 +484,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  isBook
-                      ? (item['author'] ?? '未知作者')
-                      : (item['class_name'] ?? '未分配班级'),
+                  subtitle,
                   style: TextStyle(color: Colors.grey[600], fontSize: 13),
                 ),
               ],
@@ -491,7 +499,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              '${item['count']}次',
+              '$count次',
               style: TextStyle(
                 color: Colors.blue[700],
                 fontWeight: FontWeight.w600,
