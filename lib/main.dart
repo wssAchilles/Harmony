@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import 'controllers/auth_controller.dart';
+import 'controllers/dashboard_controller.dart';
+import 'controllers/home_controller.dart';
+import 'controllers/student_list_controller.dart';
 import 'screens/auth_gate.dart';
 import 'services/backend/pocketbase_client.dart';
 
@@ -7,7 +13,28 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializePocketBase();
 
-  runApp(const MyApp());
+  runApp(const AppProviders(child: MyApp()));
+}
+
+class AppProviders extends StatelessWidget {
+  const AppProviders({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthController()..initialize()),
+        ChangeNotifierProvider(create: (_) => DashboardController()..load()),
+        ChangeNotifierProvider(create: (_) => HomeController()..initialize()),
+        ChangeNotifierProvider(
+          create: (_) => StudentListController()..loadStudents(),
+        ),
+      ],
+      child: child,
+    );
+  }
 }
 
 /// 应用主体

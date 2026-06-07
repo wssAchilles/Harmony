@@ -6,7 +6,7 @@ import '../services/student_service.dart';
 class AddEditStudentScreen extends StatefulWidget {
   final Student? student;
 
-  const AddEditStudentScreen({Key? key, this.student}) : super(key: key);
+  const AddEditStudentScreen({super.key, this.student});
 
   @override
   State<AddEditStudentScreen> createState() => _AddEditStudentScreenState();
@@ -53,21 +53,27 @@ class _AddEditStudentScreenState extends State<AddEditStudentScreen> {
 
       if (_isEditing) {
         await _studentService.updateStudent(student);
+        if (!mounted) return;
         _showSnackBar('学生信息更新成功！');
       } else {
         await _studentService.addStudent(student);
+        if (!mounted) return;
         _showSnackBar('学生添加成功！');
       }
 
       Navigator.pop(context, true);
     } catch (e) {
+      if (!mounted) return;
       _showSnackBar('操作失败: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   void _showSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
@@ -82,7 +88,7 @@ class _AddEditStudentScreenState extends State<AddEditStudentScreen> {
         actions: [
           TextButton(
             onPressed: _isLoading ? null : _saveStudent,
-            child: Text(
+            child: const Text(
               '保存',
               style: TextStyle(
                 color: Colors.white,

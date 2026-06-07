@@ -1,3 +1,5 @@
+import '../utils/app_logger.dart';
+
 import '../models/profile.dart';
 import 'app_exception.dart';
 import 'auth/auth_session.dart';
@@ -103,7 +105,7 @@ class AuthService {
       _currentProfile = await getUserProfileById(userId);
       _currentProfileUserId = userId;
     } catch (e) {
-      print('加载用户资料失败: $e');
+      AppLogger.warning('加载用户资料失败: $e');
       _currentProfile = null;
       _currentProfileUserId = null;
     }

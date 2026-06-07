@@ -3,12 +3,14 @@ import '../models/book.dart';
 import '../models/student.dart';
 import '../services/borrow_service.dart';
 import '../services/student_service.dart';
+import '../ui/widgets/async_action_button.dart';
+import '../ui/widgets/section_card.dart';
 
 /// 借书页面
 class BorrowBookScreen extends StatefulWidget {
   final Book book;
 
-  const BorrowBookScreen({Key? key, required this.book}) : super(key: key);
+  const BorrowBookScreen({super.key, required this.book});
 
   @override
   State<BorrowBookScreen> createState() => _BorrowBookScreenState();
@@ -23,6 +25,7 @@ class _BorrowBookScreenState extends State<BorrowBookScreen> {
   DateTime? _dueDate;
   bool _isLoading = true;
   bool _isBorrowing = false;
+  AsyncActionState _borrowActionState = AsyncActionState.idle;
 
   @override
   void initState() {
@@ -36,11 +39,13 @@ class _BorrowBookScreenState extends State<BorrowBookScreen> {
 
     try {
       final students = await _studentService.getAllStudents();
+      if (!mounted) return;
       setState(() {
         _students = students;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
       _showSnackBar('加载学生列表失败: $e');
     }
@@ -57,7 +62,10 @@ class _BorrowBookScreenState extends State<BorrowBookScreen> {
       return;
     }
 
-    setState(() => _isBorrowing = true);
+    setState(() {
+      _isBorrowing = true;
+      _borrowActionState = AsyncActionState.loading;
+    });
 
     try {
       // 计算借阅天数
@@ -69,16 +77,29 @@ class _BorrowBookScreenState extends State<BorrowBookScreen> {
         borrowDays: borrowDays > 0 ? borrowDays : 1,
       );
 
+      setState(() {
+        _borrowActionState = AsyncActionState.success;
+      });
       _showSnackBar('借阅成功！');
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      if (!mounted) return;
       Navigator.pop(context, true);
     } catch (e) {
-      _showSnackBar('借阅失败: $e');
+      if (mounted) {
+        setState(() {
+          _borrowActionState = AsyncActionState.error;
+        });
+        _showSnackBar('借阅失败: $e');
+      }
     } finally {
-      setState(() => _isBorrowing = false);
+      if (mounted) {
+        setState(() => _isBorrowing = false);
+      }
     }
   }
 
   void _showSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
@@ -99,73 +120,69 @@ class _BorrowBookScreenState extends State<BorrowBookScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 图书信息卡片
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          // 图书封面
-                          Container(
-                            width: 80,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[200],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: widget.book.resolvedCoverImageUrl != null
-                                ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.network(
-                                      widget.book.resolvedCoverImageUrl!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) {
-                                        return const Icon(
-                                          Icons.book,
-                                          size: 40,
-                                          color: Colors.grey,
-                                        );
-                                      },
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.book,
-                                    size: 40,
-                                    color: Colors.grey,
-                                  ),
+                  SectionCard(
+                    child: Row(
+                      children: [
+                        // 图书封面
+                        Container(
+                          width: 80,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          const SizedBox(width: 16),
-
-                          // 图书信息
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  widget.book.title,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
+                          child: widget.book.resolvedCoverImageUrl != null
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    widget.book.resolvedCoverImageUrl!,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Icon(
+                                        Icons.book,
+                                        size: 40,
+                                        color: Colors.grey,
+                                      );
+                                    },
                                   ),
+                                )
+                              : const Icon(
+                                  Icons.book,
+                                  size: 40,
+                                  color: Colors.grey,
                                 ),
-                                const SizedBox(height: 8),
-                                if (widget.book.author != null) ...[
-                                  Text(
-                                    '作者: ${widget.book.author}',
-                                    style: TextStyle(color: Colors.grey[600]),
-                                  ),
-                                  const SizedBox(height: 4),
-                                ],
-                                if (widget.book.location != null)
-                                  Text(
-                                    '位置: ${widget.book.location}',
-                                    style: TextStyle(color: Colors.grey[600]),
-                                  ),
+                        ),
+                        const SizedBox(width: 16),
+
+                        // 图书信息
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.book.title,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              if (widget.book.author != null) ...[
+                                Text(
+                                  '作者: ${widget.book.author}',
+                                  style: TextStyle(color: Colors.grey[600]),
+                                ),
+                                const SizedBox(height: 4),
                               ],
-                            ),
+                              if (widget.book.location != null)
+                                Text(
+                                  '位置: ${widget.book.location}',
+                                  style: TextStyle(color: Colors.grey[600]),
+                                ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
 
@@ -178,6 +195,7 @@ class _BorrowBookScreenState extends State<BorrowBookScreen> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<Student>(
+                    // ignore: deprecated_member_use
                     value: _selectedStudent,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
@@ -245,27 +263,13 @@ class _BorrowBookScreenState extends State<BorrowBookScreen> {
                   const Spacer(),
 
                   // 借阅按钮
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isBorrowing ? null : _borrowBook,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue.shade600,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: _isBorrowing
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                              '确认借阅',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.white,
-                              ),
-                            ),
-                    ),
+                  AsyncActionButton(
+                    onPressed: _isBorrowing ? null : _borrowBook,
+                    label: '确认借阅',
+                    successLabel: '借阅成功',
+                    errorLabel: '重试借阅',
+                    icon: Icons.bookmark_add_outlined,
+                    state: _borrowActionState,
                   ),
                 ],
               ),

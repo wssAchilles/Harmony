@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import '../utils/app_logger.dart';
 import 'package:pocketbase/pocketbase.dart';
 
 import '../models/book.dart';
@@ -32,7 +33,7 @@ class BookService {
       _lastBooksWithCategories = books;
       return books;
     } catch (e) {
-      print('获取图书和分类信息失败: $e');
+      AppLogger.warning('获取图书和分类信息失败: $e');
       if (_lastBooksWithCategories.isNotEmpty) {
         return _lastBooksWithCategories;
       }
@@ -144,7 +145,7 @@ class BookService {
     try {
       categories = await _categoryNamesById();
     } catch (e) {
-      print('加载图书分类映射失败: $e');
+      AppLogger.warning('加载图书分类映射失败: $e');
     }
 
     return records.map((record) {

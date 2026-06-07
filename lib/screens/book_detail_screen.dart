@@ -8,6 +8,9 @@ import '../services/student_service.dart';
 import '../services/borrow_service.dart';
 import 'add_edit_book_screen.dart';
 import 'borrow_quantity_dialog.dart';
+import '../ui/widgets/section_card.dart';
+import '../ui/widgets/status_chip.dart';
+import '../utils/app_logger.dart';
 
 /// 图书详情页面
 class BookDetailScreen extends StatefulWidget {
@@ -72,7 +75,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
         );
       }
     } catch (e) {
-      print('加载图书详情失败: $e');
+      AppLogger.warning('加载图书详情失败: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -470,109 +473,80 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                         const SizedBox(height: 16),
 
                         // 库存状态卡片
-                        Card(
-                          elevation: 2,
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // 库存信息标题
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.inventory_2,
+                        SectionCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // 库存信息标题
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.inventory_2,
+                                    color: Theme.of(context).primaryColor,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '库存信息',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
                                       color: Theme.of(context).primaryColor,
                                     ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      '库存信息',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Theme.of(context).primaryColor,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-
-                                // 库存详情
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceAround,
-                                  children: [
-                                    _buildStockItem(
-                                      '总数量',
-                                      _currentBook.totalQuantity.toString(),
-                                      Icons.library_books,
-                                      Colors.blue,
-                                    ),
-                                    _buildStockItem(
-                                      '可借数量',
-                                      _currentBook.availableQuantity.toString(),
-                                      Icons.check_circle,
-                                      _currentBook.isAvailable
-                                          ? Colors.green
-                                          : Colors.grey,
-                                    ),
-                                    _buildStockItem(
-                                      '已借出',
-                                      _activeBorrowedQuantity.toString(),
-                                      Icons.person_outline,
-                                      Colors.orange,
-                                    ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 16),
-
-                                // 状态标签
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: _currentBook.isAvailable
-                                        ? Colors.green[100]
-                                        : Colors.orange[100],
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        _currentBook.isAvailable
-                                            ? Icons.check_circle
-                                            : Icons.schedule,
-                                        size: 16,
-                                        color: _currentBook.isAvailable
-                                            ? Colors.green[700]
-                                            : Colors.orange[700],
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        _currentBook.statusText,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: _currentBook.isAvailable
-                                              ? Colors.green[700]
-                                              : Colors.orange[700],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                // 如果有借出记录，显示最近的借阅信息
-                                if (_currentBorrowRecords.isNotEmpty) ...[
-                                  const Divider(height: 24),
-                                  _buildBorrowInfo(),
                                 ],
+                              ),
+                              const SizedBox(height: 16),
+
+                              // 库存详情
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceAround,
+                                children: [
+                                  _buildStockItem(
+                                    '总数量',
+                                    _currentBook.totalQuantity.toString(),
+                                    Icons.library_books,
+                                    Colors.blue,
+                                  ),
+                                  _buildStockItem(
+                                    '可借数量',
+                                    _currentBook.availableQuantity.toString(),
+                                    Icons.check_circle,
+                                    _currentBook.isAvailable
+                                        ? Colors.green
+                                        : Colors.grey,
+                                  ),
+                                  _buildStockItem(
+                                    '已借出',
+                                    _activeBorrowedQuantity.toString(),
+                                    Icons.person_outline,
+                                    Colors.orange,
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 16),
+
+                              // 状态标签
+                              StatusChip(
+                                label: _currentBook.statusText,
+                                backgroundColor: _currentBook.isAvailable
+                                    ? Colors.green[100]!
+                                    : Colors.orange[100]!,
+                                foregroundColor: _currentBook.isAvailable
+                                    ? Colors.green[700]!
+                                    : Colors.orange[700]!,
+                                icon: _currentBook.isAvailable
+                                    ? Icons.check_circle
+                                    : Icons.schedule,
+                              ),
+
+                              // 如果有借出记录，显示最近的借阅信息
+                              if (_currentBorrowRecords.isNotEmpty) ...[
+                                const Divider(height: 24),
+                                _buildBorrowInfo(),
                               ],
-                            ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 24),
@@ -704,7 +678,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withAlpha(26),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: color, size: 24),

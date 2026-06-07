@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:shimmer/shimmer.dart';
 import '../models/book.dart';
-import '../services/book_service.dart';
-import '../services/auth_service.dart';
 import 'add_edit_book_screen.dart';
 import 'book_detail_screen.dart';
 import 'student_list_screen.dart';
 import '../utils/page_transitions.dart';
-import '../models/category.dart';
-import '../services/category_service.dart';
+import '../controllers/auth_controller.dart';
+import '../controllers/home_controller.dart';
+import '../ui/motion/motion.dart';
+import '../ui/widgets/empty_state_view.dart';
+import '../ui/widgets/error_state_view.dart';
+import '../ui/widgets/status_chip.dart';
 
 /// 主页界面 - 图书列表页面
 class HomeScreen extends StatefulWidget {
@@ -18,39 +22,9 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final BookService _bookService = BookService();
-  final CategoryService _categoryService = CategoryService();
-  String? _userName;
-  String? _userEmail;
-  String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
-  // 分类筛选相关状态
-  List<Category> _categories = [];
-  int? _selectedCategoryId; // null表示显示全部
-  bool _categoriesLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUserInfo();
-    _loadCategories();
-    _bookService.ensureStorageBucketExists();
-  }
-
-  // 加载分类列表
-  Future<void> _loadCategories() async {
-    try {
-      final categories = await _categoryService.getAllCategories();
-      setState(() {
-        _categories = categories;
-        _categoriesLoading = false;
-      });
-    } catch (e) {
-      setState(() => _categoriesLoading = false);
-      print('加载分类失败: $e');
-    }
-  }
+  HomeController get _controller => context.read<HomeController>();
 
   @override
   void dispose() {
@@ -58,22 +32,10 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  /// 加载用户信息
-  Future<void> _loadUserInfo() async {
-    final authService = AuthService();
-    await authService.initializeUserState();
-    if (mounted) {
-      setState(() {
-        _userEmail = authService.currentUserEmail;
-        _userName = authService.displayName;
-      });
-    }
-  }
-
   /// 处理登出逻辑
   Future<void> _handleLogout() async {
     try {
-      await AuthService().signOut();
+      await context.read<AuthController>().signOut();
       // Navigator不需要手动导航，AuthGate会自动处理
     } catch (e) {
       if (mounted) {
@@ -86,6 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 构建侧边栏
   Widget _buildDrawer() {
+    final auth = context.watch<AuthController>();
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -102,8 +65,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   radius: 30,
                   backgroundColor: Theme.of(context).colorScheme.primary,
                   child: Text(
-                    _userName?.isNotEmpty == true
-                        ? _userName![0].toUpperCase()
+                    auth.displayName.isNotEmpty
+                        ? auth.displayName[0].toUpperCase()
                         : 'U',
                     style: const TextStyle(
                       color: Colors.white,
@@ -114,14 +77,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  _userName ?? '加载中...',
+                  auth.displayName,
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 Text(
-                  _userEmail ?? '',
+                  auth.currentUserEmail ?? '',
                   style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                 ),
               ],
@@ -142,7 +105,9 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.pop(context);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => StudentListScreen()),
+                MaterialPageRoute(
+                  builder: (context) => const StudentListScreen(),
+                ),
               );
             },
           ),
@@ -167,7 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 构建图书网格项
   Widget _buildBookGridItem(Book book) {
-    return GestureDetector(
+    return _PressableBookCard(
       onTap: () => _navigateToBookDetail(book),
       child: Card(
         elevation: 4,
@@ -194,17 +159,17 @@ class _HomeScreenState extends State<HomeScreen> {
                           book.resolvedCoverImageUrl!,
                           fit: BoxFit.cover,
                           loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Container(
-                              color: Colors.grey[200],
-                              child: Center(
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.blue.shade300,
-                                  ),
-                                ),
-                              ),
+                            if (loadingProgress == null) {
+                              return AnimatedOpacity(
+                                opacity: 1,
+                                duration: const Duration(milliseconds: 150),
+                                child: child,
+                              );
+                            }
+                            return Shimmer.fromColors(
+                              baseColor: Colors.grey[300]!,
+                              highlightColor: Colors.grey[100]!,
+                              child: Container(color: Colors.grey[300]),
                             );
                           },
                           errorBuilder: (context, error, stackTrace) =>
@@ -268,27 +233,17 @@ class _HomeScreenState extends State<HomeScreen> {
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                        // 状态标签
-                        Container(
+                        StatusChip(
+                          label: book.statusText,
+                          backgroundColor: book.isAvailable
+                              ? Colors.green[100]!
+                              : Colors.orange[100]!,
+                          foregroundColor: book.isAvailable
+                              ? Colors.green[800]!
+                              : Colors.orange[800]!,
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
+                            horizontal: 7,
                             vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: book.isAvailable
-                                ? Colors.green[100]
-                                : Colors.orange[100],
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            book.statusText,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: book.isAvailable
-                                  ? Colors.green[800]
-                                  : Colors.orange[800],
-                            ),
                           ),
                         ),
                       ],
@@ -305,6 +260,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthController>();
+    final controller = context.watch<HomeController>();
     return Scaffold(
       backgroundColor: Colors.grey[100],
       drawer: _buildDrawer(),
@@ -313,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.person),
-            tooltip: _userName ?? '用户',
+            tooltip: auth.displayName,
             onPressed: () {
               // 显示用户信息对话框
               showDialog(
@@ -324,9 +281,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('姓名: ${_userName ?? "未设置"}'),
+                      Text('姓名: ${auth.displayName}'),
                       const SizedBox(height: 8),
-                      Text('邮箱: ${_userEmail ?? "未知"}'),
+                      Text('邮箱: ${auth.currentUserEmail ?? "未知"}'),
                     ],
                   ),
                   actions: [
@@ -351,177 +308,148 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // 搜索栏
-          Container(
-            padding: const EdgeInsets.all(16.0),
-            color: Colors.grey[100],
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: '搜索书名、作者或位置...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          setState(() {
-                            _searchController.clear();
-                            _searchQuery = '';
-                          });
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: Colors.white,
-              ),
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
-              },
-            ),
-          ),
-
-          // 分类筛选栏
-          if (!_categoriesLoading && _categories.isNotEmpty)
-            Container(
-              height: 60,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  // "全部"筛选芯片
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: FilterChip(
-                      label: const Text('全部'),
-                      selected: _selectedCategoryId == null,
-                      onSelected: (_) {
-                        setState(() {
-                          _selectedCategoryId = null;
-                        });
-                      },
-                      backgroundColor: Colors.grey[200],
-                      selectedColor: Colors.blue[100],
-                      checkmarkColor: Colors.blue[700],
+      body: AnimatedBuilder(
+        animation: controller,
+        builder: (context, child) {
+          return Column(
+            children: [
+              // 搜索栏
+              Container(
+                padding: const EdgeInsets.all(16.0),
+                color: Colors.grey[100],
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: '搜索书名、作者或位置...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _controller.searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              _controller.clearSearch();
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(30),
+                      borderSide: BorderSide.none,
                     ),
+                    filled: true,
+                    fillColor: Colors.white,
                   ),
-                  // 分类筛选芯片
-                  ..._categories.map(
-                    (category) => Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        label: Text(category.name),
-                        selected: _selectedCategoryId == category.id,
-                        onSelected: (_) {
-                          setState(() {
-                            _selectedCategoryId = category.id;
-                          });
-                        },
-                        backgroundColor: Colors.grey[200],
-                        selectedColor: Colors.blue[100],
-                        checkmarkColor: Colors.blue[700],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          // 图书列表
-          Expanded(
-            child: StreamBuilder<List<Book>>(
-              stream: _bookService.getBooksStream(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(child: Text('加载失败: ${snapshot.error}'));
-                }
-
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                // 根据搜索条件和分类过滤图书
-                List<Book> books = snapshot.data!;
-
-                // 按分类筛选
-                if (_selectedCategoryId != null) {
-                  books = books.where((book) {
-                    return book.categoryId == _selectedCategoryId;
-                  }).toList();
-                }
-
-                // 按搜索关键词筛选
-                if (_searchQuery.isNotEmpty) {
-                  books = books.where((book) {
-                    return book.title.toLowerCase().contains(
-                              _searchQuery.toLowerCase(),
-                            ) ||
-                        (book.author?.toLowerCase() ?? '').contains(
-                          _searchQuery.toLowerCase(),
-                        ) ||
-                        (book.location?.toLowerCase() ?? '').contains(
-                          _searchQuery.toLowerCase(),
-                        ) ||
-                        (book.categoryName?.toLowerCase() ?? '').contains(
-                          _searchQuery.toLowerCase(),
-                        );
-                  }).toList();
-                }
-
-                if (books.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.library_books,
-                          size: 100,
-                          color: Colors.grey[300],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _searchQuery.isEmpty ? '暂无图书' : '未找到匹配的图书',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        if (_searchQuery.isEmpty)
-                          const Text(
-                            '点击右下角按钮添加第一本图书',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                      ],
-                    ),
-                  );
-                }
-
-                return GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.75,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                  ),
-                  itemCount: books.length,
-                  itemBuilder: (context, index) {
-                    final book = books[index];
-                    return _buildBookGridItem(book);
+                  onChanged: (value) {
+                    _controller.setSearchQuery(value);
                   },
-                );
-              },
-            ),
-          ),
-        ],
+                ),
+              ),
+
+              // 分类筛选栏
+              if (!_controller.categoriesLoading &&
+                  _controller.categories.isNotEmpty)
+                Container(
+                  height: 60,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      // "全部"筛选芯片
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilterChip(
+                          label: const Text('全部'),
+                          selected: _controller.selectedCategoryId == null,
+                          onSelected: (_) {
+                            _controller.selectCategory(null);
+                          },
+                          backgroundColor: Colors.grey[200],
+                          selectedColor: Colors.blue[100],
+                          checkmarkColor: Colors.blue[700],
+                        ),
+                      ),
+                      // 分类筛选芯片
+                      ..._controller.categories.map(
+                        (category) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            label: Text(category.name),
+                            selected:
+                                _controller.selectedCategoryId == category.id,
+                            onSelected: (_) {
+                              _controller.selectCategory(category.id);
+                            },
+                            backgroundColor: Colors.grey[200],
+                            selectedColor: Colors.blue[100],
+                            checkmarkColor: Colors.blue[700],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // 图书列表
+              Expanded(
+                child: StreamBuilder<List<Book>>(
+                  stream: _controller.booksStream,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return ErrorStateView(
+                        title: '图书加载失败',
+                        message: '${snapshot.error}',
+                      );
+                    }
+
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final books = _controller.filterBooks(snapshot.data!);
+                    final resultKey = ValueKey(
+                      '${_controller.selectedCategoryId}-${_controller.searchQuery}-${books.length}',
+                    );
+
+                    if (books.isEmpty) {
+                      return AnimatedSwitcher(
+                        duration: AppMotion.normal,
+                        child: EmptyStateView(
+                          key: resultKey,
+                          icon: Icons.library_books,
+                          title: _controller.searchQuery.isEmpty
+                              ? '暂无图书'
+                              : '未找到匹配的图书',
+                          message: _controller.searchQuery.isEmpty
+                              ? '点击右下角按钮添加第一本图书'
+                              : '请尝试其他搜索关键词或分类',
+                        ),
+                      );
+                    }
+
+                    return AnimatedSwitcher(
+                      duration: AppMotion.normal,
+                      child: GridView.builder(
+                        key: resultKey,
+                        padding: const EdgeInsets.all(16),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.75,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                        ),
+                        itemCount: books.length,
+                        itemBuilder: (context, index) {
+                          final book = books[index];
+                          return _buildBookGridItem(book);
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
       ),
       // 悬浮按钮 - 添加新书
       floatingActionButton: FloatingActionButton(
@@ -532,8 +460,43 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         },
         tooltip: '添加新书',
-        child: const Icon(Icons.add),
         heroTag: 'add_book_fab',
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+
+class _PressableBookCard extends StatefulWidget {
+  const _PressableBookCard({required this.child, required this.onTap});
+
+  final Widget child;
+  final VoidCallback onTap;
+
+  @override
+  State<_PressableBookCard> createState() => _PressableBookCardState();
+}
+
+class _PressableBookCardState extends State<_PressableBookCard> {
+  bool _isPressed = false;
+
+  void _setPressed(bool value) {
+    if (_isPressed == value) return;
+    setState(() => _isPressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onTap,
+      onTapDown: (_) => _setPressed(true),
+      onTapCancel: () => _setPressed(false),
+      onTapUp: (_) => _setPressed(false),
+      child: AnimatedScale(
+        scale: _isPressed ? 0.98 : 1,
+        duration: AppMotion.fast,
+        curve: AppMotion.standardCurve,
+        child: widget.child,
       ),
     );
   }

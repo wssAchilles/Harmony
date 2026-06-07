@@ -1,3 +1,5 @@
+import '../utils/app_logger.dart';
+
 import '../models/category.dart';
 import 'app_exception.dart';
 import 'backend/backend_gateway.dart';
@@ -20,7 +22,7 @@ class CategoryService {
         },
       );
     } catch (e) {
-      print('添加分类失败: $e');
+      AppLogger.warning('添加分类失败: $e');
       rethrow;
     }
   }
@@ -35,7 +37,7 @@ class CategoryService {
           .map((record) => Category.fromJson(recordToJson(record)))
           .toList();
     } catch (e) {
-      print('获取分类列表失败: $e');
+      AppLogger.warning('获取分类列表失败: $e');
       return [];
     }
   }
@@ -56,7 +58,7 @@ class CategoryService {
         {'name': category.name.trim()},
       );
     } catch (e) {
-      print('更新分类失败: $e');
+      AppLogger.warning('更新分类失败: $e');
       rethrow;
     }
   }
@@ -74,7 +76,7 @@ class CategoryService {
       );
       await _backend.delete('categories', recordId);
     } catch (e) {
-      print('删除分类失败: $e');
+      AppLogger.warning('删除分类失败: $e');
       rethrow;
     }
   }
@@ -87,7 +89,7 @@ class CategoryService {
       );
       await _backend.delete('categories', recordId);
     } catch (e) {
-      print('强制删除分类失败: $e');
+      AppLogger.warning('强制删除分类失败: $e');
       rethrow;
     }
   }
@@ -101,7 +103,7 @@ class CategoryService {
       );
       return records.length;
     } catch (e) {
-      print('获取分类图书数量失败: $e');
+      AppLogger.warning('获取分类图书数量失败: $e');
       return 0;
     }
   }
@@ -112,7 +114,7 @@ class CategoryService {
       if (record == null) return null;
       return Category.fromJson(recordToJson(record));
     } catch (e) {
-      print('获取分类详情失败: $e');
+      AppLogger.warning('获取分类详情失败: $e');
       return null;
     }
   }
@@ -126,7 +128,7 @@ class CategoryService {
       );
       return records.any((record) => asInt(record.id) != excludeId);
     } catch (e) {
-      print('检查分类名称失败: $e');
+      AppLogger.warning('检查分类名称失败: $e');
       return false;
     }
   }

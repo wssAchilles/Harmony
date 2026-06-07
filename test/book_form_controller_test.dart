@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kindergarten_library/models/book.dart';
-import 'package:kindergarten_library/screens/book_form_controller.dart';
+import 'package:kindergarten_library/controllers/book_form_controller.dart';
 
 void main() {
   test('builds new book from form fields', () {

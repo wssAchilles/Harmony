@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
-import '../models/dashboard_data.dart';
-import '../services/dashboard_service.dart';
-import '../services/auth_service.dart';
+import 'package:provider/provider.dart';
+import '../controllers/auth_controller.dart';
+import '../controllers/dashboard_controller.dart';
 import '../screens/overdue_records_screen.dart';
 import '../screens/admin/all_borrow_records_screen.dart';
 import 'package:intl/intl.dart';
 import '../utils/page_transitions.dart';
+import '../ui/motion/motion.dart';
+import '../ui/widgets/error_state_view.dart';
+import '../ui/widgets/section_card.dart';
 import 'package:shimmer/shimmer.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({Key? key}) : super(key: key);
+  const DashboardScreen({super.key});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -17,190 +20,263 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen>
     with SingleTickerProviderStateMixin {
-  final DashboardService _dashboardService = DashboardService();
-  final AuthService _authService = AuthService();
+  DashboardController? _controller;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-
-  DashboardSummary _summary = const DashboardSummary.empty();
-  List<TopBorrowedBook> _topBooks = [];
-  List<TopActiveStudent> _topStudents = [];
-  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 900),
       vsync: this,
     );
     _fadeAnimation = CurvedAnimation(
       parent: _animationController,
-      curve: Curves.easeIn,
+      curve: AppMotion.emphasizedCurve,
     );
-    _loadDashboardData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final controller = context.read<DashboardController>();
+    if (identical(_controller, controller)) return;
+    _controller?.removeListener(_handleDashboardState);
+    _controller = controller;
+    controller.addListener(_handleDashboardState);
+    _handleDashboardState();
   }
 
   @override
   void dispose() {
+    _controller?.removeListener(_handleDashboardState);
     _animationController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadDashboardData() async {
-    setState(() => _isLoading = true);
-
-    try {
-      final summary = await _dashboardService.getDashboardSummary();
-      final topBooks = await _dashboardService.getTopBorrowedBooks();
-      final topStudents = await _dashboardService.getTopActiveStudents();
-
-      setState(() {
-        _summary = summary;
-        _topBooks = topBooks;
-        _topStudents = topStudents;
-        _isLoading = false;
-      });
-
+  void _handleDashboardState() {
+    if (!mounted) return;
+    final controller = _controller;
+    if (controller == null) return;
+    if (controller.isLoading) {
+      _animationController.reset();
+      return;
+    }
+    if (controller.errorMessage == null && !_animationController.isAnimating) {
       _animationController.forward();
-    } catch (e) {
-      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadDashboardData() async {
+    final controller = _controller;
+    if (controller == null) return;
+    _animationController.reset();
+    await controller.load();
+    if (controller.errorMessage == null) {
+      _animationController.forward();
+    } else if (mounted) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('加载数据失败: $e')));
+      ).showSnackBar(
+        SnackBar(content: Text('加载数据失败: ${controller.errorMessage}')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final hasAdminAccess = context.select<AuthController, bool>(
+      (auth) => auth.isLoggedIn && auth.isAdmin,
+    );
+    final controller = context.watch<DashboardController>();
+
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      body: RefreshIndicator(
-        onRefresh: _loadDashboardData,
-        child: _isLoading
-            ? _buildSkeletonUI()
-            : FadeTransition(
-                opacity: _fadeAnimation,
-                child: CustomScrollView(
-                  slivers: [
-                    // 自定义App Bar
-                    SliverAppBar(
-                      expandedHeight: 120,
-                      floating: false,
-                      pinned: true,
-                      backgroundColor: Colors.blue.shade600,
-                      flexibleSpace: FlexibleSpaceBar(
-                        title: const Text(
-                          '图书馆仪表盘',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 20,
+      body: AnimatedBuilder(
+        animation: controller,
+        builder: (context, child) {
+          final content = controller.isLoading
+              ? _buildSkeletonUI()
+              : controller.errorMessage != null
+                  ? CustomScrollView(
+                      slivers: [
+                        SliverFillRemaining(
+                          child: ErrorStateView(
+                            title: '仪表盘加载失败',
+                            message: controller.errorMessage,
+                            onRetry: _loadDashboardData,
                           ),
                         ),
-                        background: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.blue.shade600,
-                                Colors.blue.shade800,
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
+                      ],
+                    )
+                  : FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: CustomScrollView(
+                        slivers: [
+                          SliverAppBar(
+                            expandedHeight: 120,
+                            floating: false,
+                            pinned: true,
+                            backgroundColor: Colors.blue.shade600,
+                            flexibleSpace: FlexibleSpaceBar(
+                              title: const Text(
+                                '图书馆仪表盘',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 20,
+                                ),
+                              ),
+                              background: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.blue.shade600,
+                                      Colors.blue.shade800,
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                    ),
-
-                    // 统计卡片区域
-                    SliverPadding(
-                      padding: const EdgeInsets.all(16),
-                      sliver: SliverGrid(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 2.2,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                        ),
-                        delegate: SliverChildListDelegate([
-                          _buildStatCard(
-                            title: '图书总数',
-                            value: '${_summary.totalBooks}',
-                            icon: Icons.menu_book,
-                            color: Colors.blue,
-                          ),
-                          _buildStatCard(
-                            title: '学生总数',
-                            value: '${_summary.totalStudents}',
-                            icon: Icons.people,
-                            color: Colors.green,
-                          ),
-                          _buildStatCard(
-                            title: '当前在借',
-                            value: '${_summary.currentBorrowed}',
-                            icon: Icons.book_outlined,
-                            color: Colors.orange,
-                          ),
-                          _buildStatCard(
-                            title: '逾期未还',
-                            value: '${_summary.overdueCount}',
-                            icon: Icons.warning,
-                            color: Colors.red,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                SlidePageRoute(
-                                  page: const OverdueRecordsScreen(),
+                          SliverPadding(
+                            padding: const EdgeInsets.all(16),
+                            sliver: SliverGrid(
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 2.2,
+                                crossAxisSpacing: 16,
+                                mainAxisSpacing: 16,
+                              ),
+                              delegate: SliverChildListDelegate([
+                                _buildStaggered(
+                                  index: 0,
+                                  child: _buildStatCard(
+                                    title: '图书总数',
+                                    value: '${controller.summary.totalBooks}',
+                                    icon: Icons.menu_book,
+                                    color: Colors.blue,
+                                  ),
                                 ),
-                              );
-                            },
+                                _buildStaggered(
+                                  index: 1,
+                                  child: _buildStatCard(
+                                    title: '学生总数',
+                                    value:
+                                        '${controller.summary.totalStudents}',
+                                    icon: Icons.people,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                                _buildStaggered(
+                                  index: 2,
+                                  child: _buildStatCard(
+                                    title: '当前在借',
+                                    value:
+                                        '${controller.summary.currentBorrowed}',
+                                    icon: Icons.book_outlined,
+                                    color: Colors.orange,
+                                  ),
+                                ),
+                                _buildStaggered(
+                                  index: 3,
+                                  child: _buildStatCard(
+                                    title: '逾期未还',
+                                    value: '${controller.summary.overdueCount}',
+                                    icon: Icons.warning,
+                                    color: Colors.red,
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        SlidePageRoute(
+                                          page: const OverdueRecordsScreen(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ]),
+                            ),
                           ),
-                        ]),
+                          SliverPadding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            sliver: SliverToBoxAdapter(
+                              child: _buildStaggered(
+                                index: 4,
+                                child: _buildMonthlyStatCard(
+                                  hasAdminAccess: hasAdminAccess,
+                                  monthlyBorrows:
+                                      controller.summary.monthlyBorrows,
+                                ),
+                              ),
+                            ),
+                          ),
+                          SliverPadding(
+                            padding: const EdgeInsets.all(16),
+                            sliver: SliverToBoxAdapter(
+                              child: _buildStaggered(
+                                index: 5,
+                                child: _buildRankingCard(
+                                  title: '🔥 本月热门图书',
+                                  items: controller.topBooks,
+                                  titleFor: (book) => book.title ?? '',
+                                  subtitleFor: (book) => book.author ?? '未知作者',
+                                  countFor: (book) => book.count,
+                                ),
+                              ),
+                            ),
+                          ),
+                          SliverPadding(
+                            padding: const EdgeInsets.all(16),
+                            sliver: SliverToBoxAdapter(
+                              child: _buildStaggered(
+                                index: 6,
+                                child: _buildRankingCard(
+                                  title: '⭐ 本月借阅之星',
+                                  items: controller.topStudents,
+                                  titleFor: (student) => student.fullName ?? '',
+                                  subtitleFor: (student) =>
+                                      student.className ?? '未分配班级',
+                                  countFor: (student) => student.count,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SliverPadding(
+                            padding: EdgeInsets.only(bottom: 80),
+                          ),
+                        ],
                       ),
-                    ),
+                    );
 
-                    // 本月借阅统计
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      sliver: SliverToBoxAdapter(
-                        child: _buildMonthlyStatCard(),
-                      ),
-                    ),
+          return RefreshIndicator(
+            onRefresh: _loadDashboardData,
+            child: content,
+          );
+        },
+      ),
+    );
+  }
 
-                    // 热门图书排行榜
-                    SliverPadding(
-                      padding: const EdgeInsets.all(16),
-                      sliver: SliverToBoxAdapter(
-                        child: _buildRankingCard(
-                          title: '🔥 本月热门图书',
-                          items: _topBooks,
-                          titleFor: (book) => book.title ?? '',
-                          subtitleFor: (book) => book.author ?? '未知作者',
-                          countFor: (book) => book.count,
-                        ),
-                      ),
-                    ),
+  Widget _buildStaggered({required int index, required Widget child}) {
+    final start = (index * 0.07).clamp(0.0, 0.7);
+    final end = (start + 0.35).clamp(0.0, 1.0);
+    final animation = CurvedAnimation(
+      parent: _animationController,
+      curve: Interval(start, end, curve: AppMotion.emphasizedCurve),
+    );
 
-                    // 借阅之星排行榜
-                    SliverPadding(
-                      padding: const EdgeInsets.all(16),
-                      sliver: SliverToBoxAdapter(
-                        child: _buildRankingCard(
-                          title: '⭐ 本月借阅之星',
-                          items: _topStudents,
-                          titleFor: (student) => student.fullName ?? '',
-                          subtitleFor: (student) =>
-                              student.className ?? '未分配班级',
-                          countFor: (student) => student.count,
-                        ),
-                      ),
-                    ),
-
-                    const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
-                  ],
-                ),
-              ),
+    return FadeTransition(
+      opacity: animation,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: AppMotion.subtleUp,
+          end: Offset.zero,
+        ).animate(animation),
+        child: child,
       ),
     );
   }
@@ -212,82 +288,72 @@ class _DashboardScreenState extends State<DashboardScreen>
     required Color color,
     VoidCallback? onTap,
   }) {
-    return GestureDetector(
+    return _PressableScale(
       onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+      child: SectionCard(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // 左侧图标区域
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withAlpha(26),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 12),
+            // 右侧文字区域
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 数值
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[900],
+                      height: 1.0,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  // 中文标签
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      height: 1.0,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
           ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // 左侧图标区域
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              const SizedBox(width: 12),
-              // 右侧文字区域
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 数值
-                    Text(
-                      value,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[900],
-                        height: 1.0,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    // 中文标签
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                        height: 1.0,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );
   }
 
-  Widget _buildMonthlyStatCard() {
+  Widget _buildMonthlyStatCard({
+    required bool hasAdminAccess,
+    required int monthlyBorrows,
+  }) {
     final monthName = DateFormat('yyyy年MM月').format(DateTime.now());
     return GestureDetector(
       onTap: () {
         // 只有管理员才可以访问所有借阅记录页面
-        if (_authService.hasAdminAccess()) {
+        if (hasAdminAccess) {
           Navigator.push(
             context,
             SlidePageRoute(page: const AllBorrowRecordsScreen()),
@@ -303,10 +369,10 @@ class _DashboardScreenState extends State<DashboardScreen>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Colors.purple.withOpacity(0.3),
+              color: Colors.purple.withAlpha(77),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -317,8 +383,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.white.withAlpha(51),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(
                 Icons.calendar_month,
@@ -334,13 +400,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                   Text(
                     monthName,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withAlpha(230),
                       fontSize: 16,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${_summary.monthlyBorrows} 次借阅',
+                    '$monthlyBorrows 次借阅',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 24,
@@ -351,10 +417,10 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
             ),
             // 管理员显示可点击提示
-            if (_authService.hasAdminAccess())
+            if (hasAdminAccess)
               Icon(
                 Icons.admin_panel_settings,
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withAlpha(204),
                 size: 20,
               ),
           ],
@@ -370,18 +436,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     required String Function(T item) subtitleFor,
     required int Function(T item) countFor,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    return SectionCard(
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -422,7 +478,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 subtitle: subtitleFor(item),
                 count: countFor(item),
               );
-            }).toList(),
+            }),
           const SizedBox(height: 8),
         ],
       ),
@@ -495,7 +551,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.1),
+              color: Colors.blue.withAlpha(26),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -581,10 +637,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withAlpha(13),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -601,7 +657,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 height: 40,
                 decoration: BoxDecoration(
                   color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
               const SizedBox(width: 12),
@@ -680,10 +736,10 @@ class _DashboardScreenState extends State<DashboardScreen>
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withAlpha(13),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
@@ -738,6 +794,41 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PressableScale extends StatefulWidget {
+  const _PressableScale({required this.child, this.onTap});
+
+  final Widget child;
+  final VoidCallback? onTap;
+
+  @override
+  State<_PressableScale> createState() => _PressableScaleState();
+}
+
+class _PressableScaleState extends State<_PressableScale> {
+  bool _isPressed = false;
+
+  void _setPressed(bool value) {
+    if (_isPressed == value) return;
+    setState(() => _isPressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onTap,
+      onTapDown: widget.onTap == null ? null : (_) => _setPressed(true),
+      onTapCancel: widget.onTap == null ? null : () => _setPressed(false),
+      onTapUp: widget.onTap == null ? null : (_) => _setPressed(false),
+      child: AnimatedScale(
+        scale: _isPressed ? 0.98 : 1,
+        duration: AppMotion.fast,
+        curve: AppMotion.standardCurve,
+        child: widget.child,
       ),
     );
   }

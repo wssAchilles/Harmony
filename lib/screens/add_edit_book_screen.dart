@@ -7,7 +7,8 @@ import '../services/book_service.dart';
 import '../models/category.dart';
 import '../services/category_service.dart';
 import '../config/backend_config.dart';
-import 'book_form_controller.dart';
+import '../controllers/book_form_controller.dart';
+import '../utils/app_logger.dart';
 
 /// 添加/编辑图书页面
 class AddEditBookScreen extends StatefulWidget {
@@ -64,7 +65,7 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
       });
     } catch (e) {
       setState(() => _categoriesLoading = false);
-      print('加载分类失败: $e');
+      AppLogger.warning('加载分类失败: $e');
     }
   }
 
@@ -408,6 +409,7 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
 
               // 分类选择下拉框
               DropdownButtonFormField<Category>(
+                // ignore: deprecated_member_use
                 value: _selectedCategory,
                 decoration: const InputDecoration(
                   labelText: '图书分类',
@@ -467,11 +469,11 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
                         // 总库存输入框
                         TextFormField(
                           controller: _form.totalQuantityController,
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             labelText: '总库存 *',
                             hintText: '请输入图书总数量',
-                            prefixIcon: const Icon(Icons.inventory_2),
-                            border: const OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.inventory_2),
+                            border: OutlineInputBorder(),
                             helperText: '图书馆中该书目的总数量（包含已借出和在馆的）',
                           ),
                           keyboardType: TextInputType.number,
@@ -482,11 +484,11 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
                         // 在馆数量输入框
                         TextFormField(
                           controller: _form.availableQuantityController,
-                          decoration: InputDecoration(
+                          decoration: const InputDecoration(
                             labelText: '在馆数量 *',
                             hintText: '请输入当前在馆可借数量',
-                            prefixIcon: const Icon(Icons.check_circle),
-                            border: const OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.check_circle),
+                            border: OutlineInputBorder(),
                             helperText: '当前在馆可供借阅的数量，用于纠正库存差错',
                           ),
                           keyboardType: TextInputType.number,

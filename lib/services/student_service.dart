@@ -1,3 +1,5 @@
+import '../utils/app_logger.dart';
+
 import '../models/student.dart';
 import 'app_exception.dart';
 import 'backend/backend_gateway.dart';
@@ -28,7 +30,7 @@ class StudentService {
           .map((record) => Student.fromJson(recordToJson(record)))
           .toList();
     } catch (e) {
-      print('获取学生列表失败: $e');
+      AppLogger.warning('获取学生列表失败: $e');
       rethrow;
     }
   }
@@ -44,7 +46,7 @@ class StudentService {
           .map((record) => Student.fromJson(recordToJson(record)))
           .toList();
     } catch (e) {
-      print('按班级获取学生失败: $e');
+      AppLogger.warning('按班级获取学生失败: $e');
       rethrow;
     }
   }
@@ -61,7 +63,7 @@ class StudentService {
           .map((record) => Student.fromJson(recordToJson(record)))
           .toList();
     } catch (e) {
-      print('搜索学生失败: $e');
+      AppLogger.warning('搜索学生失败: $e');
       rethrow;
     }
   }
@@ -72,7 +74,7 @@ class StudentService {
       if (record == null) return null;
       return Student.fromJson(recordToJson(record));
     } catch (e) {
-      print('获取学生详情失败: $e');
+      AppLogger.warning('获取学生详情失败: $e');
       rethrow;
     }
   }
@@ -89,7 +91,7 @@ class StudentService {
         },
       );
     } catch (e) {
-      print('添加学生失败: $e');
+      AppLogger.warning('添加学生失败: $e');
       rethrow;
     }
   }
@@ -113,7 +115,7 @@ class StudentService {
         },
       );
     } catch (e) {
-      print('更新学生失败: $e');
+      AppLogger.warning('更新学生失败: $e');
       rethrow;
     }
   }
@@ -134,7 +136,7 @@ class StudentService {
           await _backend.requireRecordIdByNumericId('students', studentId);
       await _backend.delete('students', recordId);
     } catch (e) {
-      print('删除学生失败: $e');
+      AppLogger.warning('删除学生失败: $e');
       rethrow;
     }
   }
@@ -151,7 +153,7 @@ class StudentService {
         ..sort();
       return classes;
     } catch (e) {
-      print('获取班级列表失败: $e');
+      AppLogger.warning('获取班级列表失败: $e');
       return [];
     }
   }
@@ -162,7 +164,7 @@ class StudentService {
         await addStudent(student);
       }
     } catch (e) {
-      print('批量导入学生失败: $e');
+      AppLogger.warning('批量导入学生失败: $e');
       rethrow;
     }
   }

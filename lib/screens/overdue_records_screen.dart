@@ -4,7 +4,7 @@ import '../services/dashboard_service.dart';
 import 'package:intl/intl.dart';
 
 class OverdueRecordsScreen extends StatefulWidget {
-  const OverdueRecordsScreen({Key? key}) : super(key: key);
+  const OverdueRecordsScreen({super.key});
 
   @override
   State<OverdueRecordsScreen> createState() => _OverdueRecordsScreenState();
@@ -26,11 +26,13 @@ class _OverdueRecordsScreenState extends State<OverdueRecordsScreen> {
 
     try {
       final records = await _dashboardService.getOverdueRecords();
+      if (!mounted) return;
       setState(() {
         _overdueRecords = records;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(
         context,

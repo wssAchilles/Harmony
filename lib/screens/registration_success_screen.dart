@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'dart:io';
+import '../utils/app_logger.dart';
 
 /// 注册成功页面 - 引导用户完成邮箱验证
 class RegistrationSuccessScreen extends StatelessWidget {
@@ -92,7 +92,7 @@ class RegistrationSuccessScreen extends StatelessWidget {
   void _launchEmailApp(String url) {
     // 这里可以使用url_launcher插件来打开邮箱
     // 由于没有添加该依赖，这里只是示例
-    debugPrint('尝试打开邮箱: $url');
+    AppLogger.warning('尝试打开邮箱: $url');
   }
 
   @override
@@ -157,7 +157,7 @@ class RegistrationSuccessScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.green.withOpacity(0.1),
+                      color: Colors.green.withAlpha(26),
                       blurRadius: 10,
                       offset: const Offset(0, 2),
                     ),

@@ -74,7 +74,7 @@ class _CheckEmailScreenState extends State<CheckEmailScreen>
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.green.withOpacity(0.3),
+                            color: Colors.green.withAlpha(77),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           ),
@@ -120,7 +120,7 @@ class _CheckEmailScreenState extends State<CheckEmailScreen>
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.green.withOpacity(0.1),
+                      color: Colors.green.withAlpha(26),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),

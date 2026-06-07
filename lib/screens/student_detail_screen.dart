@@ -10,8 +10,7 @@ import 'package:intl/intl.dart';
 class StudentDetailScreen extends StatefulWidget {
   final Student student;
 
-  const StudentDetailScreen({Key? key, required this.student})
-      : super(key: key);
+  const StudentDetailScreen({super.key, required this.student});
 
   @override
   State<StudentDetailScreen> createState() => _StudentDetailScreenState();
@@ -57,6 +56,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
       final records = await _borrowService.getStudentBorrowHistory(
         widget.student.id!,
       );
+      if (!mounted) return;
 
       setState(() {
         _borrowHistory = records;
@@ -72,6 +72,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
 
       _animationController.forward();
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
       _showSnackBar('加载借阅记录失败: $e');
     }
@@ -80,9 +81,11 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
   Future<void> _returnBook(int recordId) async {
     try {
       await _borrowService.returnBook(recordId);
+      if (!mounted) return;
       _showSnackBar('还书成功！');
       _loadStudentBorrows(); // 重新加载数据
     } catch (e) {
+      if (!mounted) return;
       _showSnackBar('还书失败: $e');
     }
   }
@@ -110,19 +113,20 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
     );
   }
 
-  void _editStudent() {
-    Navigator.push(
+  Future<void> _editStudent() async {
+    final result = await Navigator.push(
       context,
       SlidePageRoute(page: AddEditStudentScreen(student: widget.student)),
-    ).then((result) {
-      if (result == true) {
-        // 学生信息已更新，重新加载页面
-        Navigator.pop(context, true);
-      }
-    });
+    );
+    if (!mounted) return;
+    if (result == true) {
+      // 学生信息已更新，重新加载页面
+      Navigator.pop(context, true);
+    }
   }
 
   void _showSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
@@ -358,7 +362,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withAlpha(26),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: color, size: 24),

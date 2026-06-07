@@ -10,7 +10,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await initializePocketBase();
 
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(const AppProviders(child: MyApp()));
     await tester.pumpAndSettle();
 
     expect(find.text('幼儿园图书管理系统'), findsOneWidget);

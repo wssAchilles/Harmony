@@ -1,3 +1,4 @@
+import '../utils/app_logger.dart';
 import 'package:pocketbase/pocketbase.dart';
 
 import '../models/book.dart';
@@ -166,7 +167,7 @@ class BorrowService {
         },
       );
     } catch (e) {
-      print('归还图书失败: $e');
+      AppLogger.warning('归还图书失败: $e');
       rethrow;
     }
   }
@@ -189,7 +190,7 @@ class BorrowService {
       if (record == null) return null;
       return _borrowRecordFromRecord(record);
     } catch (e) {
-      print('获取借阅记录失败: $e');
+      AppLogger.warning('获取借阅记录失败: $e');
       return null;
     }
   }
@@ -201,7 +202,7 @@ class BorrowService {
         sort: '-borrow_date',
       );
     } catch (e) {
-      print('获取学生借阅历史失败: $e');
+      AppLogger.warning('获取学生借阅历史失败: $e');
       return [];
     }
   }
@@ -213,7 +214,7 @@ class BorrowService {
         sort: '-borrow_date',
       );
     } catch (e) {
-      print('获取老师借阅历史失败: $e');
+      AppLogger.warning('获取老师借阅历史失败: $e');
       return [];
     }
   }
@@ -232,7 +233,7 @@ class BorrowService {
         sort: 'due_date',
       );
     } catch (e) {
-      print('获取逾期记录失败: $e');
+      AppLogger.warning('获取逾期记录失败: $e');
       return [];
     }
   }
@@ -259,7 +260,7 @@ class BorrowService {
         {'due_date': dateForPocketBase(newDueDate)},
       );
     } catch (e) {
-      print('续借失败: $e');
+      AppLogger.warning('续借失败: $e');
       rethrow;
     }
   }
@@ -278,7 +279,7 @@ class BorrowService {
         'overdue_borrows': overdueRecords.length,
       };
     } catch (e) {
-      print('获取统计信息失败: $e');
+      AppLogger.warning('获取统计信息失败: $e');
       return {'total_borrows': 0, 'active_borrows': 0, 'overdue_borrows': 0};
     }
   }

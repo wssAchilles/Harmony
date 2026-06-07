@@ -1,3 +1,5 @@
+import '../utils/app_logger.dart';
+
 import '../models/book.dart';
 import '../models/borrow_record.dart';
 import '../models/dashboard_data.dart';
@@ -19,7 +21,7 @@ class DashboardService {
       final records = await _borrowService.getActiveBorrowRecords();
       return records.fold<int>(0, (sum, record) => sum + record.quantity);
     } catch (e) {
-      print('获取在借图书数量失败: $e');
+      AppLogger.warning('获取在借图书数量失败: $e');
       return 0;
     }
   }
@@ -29,7 +31,7 @@ class DashboardService {
       final records = await _borrowService.getOverdueRecords();
       return records.length;
     } catch (e) {
-      print('获取逾期图书数量失败: $e');
+      AppLogger.warning('获取逾期图书数量失败: $e');
       return 0;
     }
   }
@@ -78,7 +80,7 @@ class DashboardService {
       _lastTopBooks = topBooks;
       return topBooks;
     } catch (e) {
-      print('获取热门图书失败: $e');
+      AppLogger.warning('获取热门图书失败: $e');
       return _lastTopBooks ?? [];
     }
   }
@@ -128,7 +130,7 @@ class DashboardService {
       _lastTopStudents = topStudents;
       return topStudents;
     } catch (e) {
-      print('获取活跃学生失败: $e');
+      AppLogger.warning('获取活跃学生失败: $e');
       return _lastTopStudents ?? [];
     }
   }
@@ -141,7 +143,7 @@ class DashboardService {
       _lastOverdueRecords = overdueRecords;
       return overdueRecords;
     } catch (e) {
-      print('获取逾期记录失败: $e');
+      AppLogger.warning('获取逾期记录失败: $e');
       return _lastOverdueRecords ?? [];
     }
   }
@@ -187,7 +189,7 @@ class DashboardService {
       _lastSummary = summary;
       return summary;
     } catch (e) {
-      print('获取统计摘要失败: $e');
+      AppLogger.warning('获取统计摘要失败: $e');
       return _lastSummary ?? const DashboardSummary.empty();
     }
   }

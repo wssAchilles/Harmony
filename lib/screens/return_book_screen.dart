@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import '../models/borrow_record.dart';
 import '../services/borrow_service.dart';
 import 'package:intl/intl.dart';
+import '../ui/widgets/async_action_button.dart';
+import '../ui/widgets/empty_state_view.dart';
+import '../ui/widgets/section_card.dart';
+import '../ui/widgets/status_chip.dart';
 
 /// 还书页面
 class ReturnBookScreen extends StatefulWidget {
-  const ReturnBookScreen({Key? key}) : super(key: key);
+  const ReturnBookScreen({super.key});
 
   @override
   State<ReturnBookScreen> createState() => _ReturnBookScreenState();
@@ -17,6 +21,7 @@ class _ReturnBookScreenState extends State<ReturnBookScreen> {
   List<BorrowRecord> _borrowRecords = [];
   String _searchQuery = '';
   bool _isLoading = true;
+  int? _returningRecordId;
 
   @override
   void initState() {
@@ -29,23 +34,32 @@ class _ReturnBookScreenState extends State<ReturnBookScreen> {
 
     try {
       final records = await _borrowService.getActiveBorrowRecords();
+      if (!mounted) return;
       setState(() {
         _borrowRecords = records;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
       _showSnackBar('加载借阅记录失败: $e');
     }
   }
 
   Future<void> _returnBook(int recordId) async {
+    setState(() => _returningRecordId = recordId);
     try {
       await _borrowService.returnBook(recordId);
+      if (!mounted) return;
       _showSnackBar('还书成功！');
-      _loadBorrowRecords(); // 重新加载数据
+      await _loadBorrowRecords();
     } catch (e) {
+      if (!mounted) return;
       _showSnackBar('还书失败: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _returningRecordId = null);
+      }
     }
   }
 
@@ -84,6 +98,7 @@ class _ReturnBookScreenState extends State<ReturnBookScreen> {
   }
 
   void _showSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
@@ -141,25 +156,11 @@ class _ReturnBookScreenState extends State<ReturnBookScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredRecords.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.assignment_return_outlined,
-                              size: 80,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _searchQuery.isEmpty ? '暂无借阅记录' : '未找到匹配的记录',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
+                    ? EmptyStateView(
+                        icon: Icons.assignment_return_outlined,
+                        title: _searchQuery.isEmpty ? '暂无借阅记录' : '未找到匹配的记录',
+                        message:
+                            _searchQuery.isEmpty ? '当前没有待归还图书' : '请尝试其他搜索关键词',
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.all(16),
@@ -175,8 +176,10 @@ class _ReturnBookScreenState extends State<ReturnBookScreen> {
                                       .inDays
                                   : 0;
 
-                          return Card(
+                          return SectionCard(
                             margin: const EdgeInsets.only(bottom: 12),
+                            padding: EdgeInsets.zero,
+                            color: isOverdue ? Colors.red[50] : Colors.white,
                             child: ListTile(
                               leading: CircleAvatar(
                                 backgroundColor:
@@ -196,33 +199,44 @@ class _ReturnBookScreenState extends State<ReturnBookScreen> {
                                   Text(
                                     '借阅日期: ${DateFormat('yyyy-MM-dd').format(record.borrowDate)}',
                                   ),
-                                  Text(
-                                    isOverdue
-                                        ? '已逾期 $daysOverdue 天'
-                                        : '应还日期: ${record.dueDate != null ? DateFormat('yyyy-MM-dd').format(record.dueDate!) : '未设定'}',
-                                    style: TextStyle(
-                                      color: isOverdue
-                                          ? Colors.red
-                                          : Colors.grey[600],
-                                      fontWeight: isOverdue
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: StatusChip(
+                                      label: isOverdue
+                                          ? '已逾期 $daysOverdue 天'
+                                          : '应还 ${record.dueDate != null ? DateFormat('yyyy-MM-dd').format(record.dueDate!) : '未设定'}',
+                                      backgroundColor: isOverdue
+                                          ? Colors.red[100]!
+                                          : Colors.green[50]!,
+                                      foregroundColor: isOverdue
+                                          ? Colors.red[700]!
+                                          : Colors.green[700]!,
+                                      icon: isOverdue
+                                          ? Icons.warning_amber
+                                          : Icons.schedule,
                                     ),
                                   ),
                                 ],
                               ),
-                              trailing: ElevatedButton(
-                                onPressed: () => _showReturnDialog(record),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      isOverdue ? Colors.red : Colors.green,
-                                ),
-                                child: const Text(
-                                  '还书',
-                                  style: TextStyle(color: Colors.white),
+                              trailing: SizedBox(
+                                width: 96,
+                                child: AsyncActionButton(
+                                  onPressed: _returningRecordId == null
+                                      ? () => _showReturnDialog(record)
+                                      : null,
+                                  label: '还书',
+                                  successLabel: '已还',
+                                  icon: Icons.assignment_return,
+                                  state: _returningRecordId == record.id
+                                      ? AsyncActionState.loading
+                                      : AsyncActionState.idle,
+                                  minimumHeight: 40,
                                 ),
                               ),
                               isThreeLine: true,
+                              enabled: _returningRecordId == null,
+                              selected: _returningRecordId == record.id,
+                              selectedTileColor: Colors.green[50],
                             ),
                           );
                         },

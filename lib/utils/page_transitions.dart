@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../ui/motion/motion.dart';
+
 /// 自定义页面过渡动画
 class SlidePageRoute extends PageRouteBuilder {
   final Widget page;
@@ -8,25 +10,23 @@ class SlidePageRoute extends PageRouteBuilder {
 
   SlidePageRoute({
     required this.page,
-    this.duration = const Duration(milliseconds: 300),
-    this.beginOffset = const Offset(1.0, 0.0),
+    this.duration = AppMotion.page,
+    this.beginOffset = AppMotion.pageRight,
   }) : super(
-         pageBuilder: (context, animation, secondaryAnimation) => page,
-         transitionDuration: duration,
-         transitionsBuilder: (context, animation, secondaryAnimation, child) {
-           const curve = Curves.easeInOut;
+          pageBuilder: (context, animation, secondaryAnimation) => page,
+          transitionDuration: duration,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            var tween = Tween(
+              begin: beginOffset,
+              end: Offset.zero,
+            ).chain(CurveTween(curve: AppMotion.standardCurve));
 
-           var tween = Tween(
-             begin: beginOffset,
-             end: Offset.zero,
-           ).chain(CurveTween(curve: curve));
-
-           return SlideTransition(
-             position: animation.drive(tween),
-             child: child,
-           );
-         },
-       );
+            return SlideTransition(
+              position: animation.drive(tween),
+              child: child,
+            );
+          },
+        );
 }
 
 /// 渐显页面过渡动画
@@ -36,22 +36,22 @@ class FadePageRoute extends PageRouteBuilder {
 
   FadePageRoute({
     required this.page,
-    this.duration = const Duration(milliseconds: 400),
+    this.duration = AppMotion.slow,
   }) : super(
-         pageBuilder: (context, animation, secondaryAnimation) => page,
-         transitionDuration: duration,
-         transitionsBuilder: (context, animation, secondaryAnimation, child) {
-           return FadeTransition(
-             opacity: animation.drive(
-               Tween(
-                 begin: 0.0,
-                 end: 1.0,
-               ).chain(CurveTween(curve: Curves.easeIn)),
-             ),
-             child: child,
-           );
-         },
-       );
+          pageBuilder: (context, animation, secondaryAnimation) => page,
+          transitionDuration: duration,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: animation.drive(
+                Tween(
+                  begin: 0.0,
+                  end: 1.0,
+                ).chain(CurveTween(curve: AppMotion.emphasizedCurve)),
+              ),
+              child: child,
+            );
+          },
+        );
 }
 
 /// 缩放页面过渡动画
@@ -61,24 +61,22 @@ class ScalePageRoute extends PageRouteBuilder {
 
   ScalePageRoute({
     required this.page,
-    this.duration = const Duration(milliseconds: 350),
+    this.duration = AppMotion.slow,
   }) : super(
-         pageBuilder: (context, animation, secondaryAnimation) => page,
-         transitionDuration: duration,
-         transitionsBuilder: (context, animation, secondaryAnimation, child) {
-           const curve = Curves.elasticOut;
+          pageBuilder: (context, animation, secondaryAnimation) => page,
+          transitionDuration: duration,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            var tween = Tween(
+              begin: 0.5,
+              end: 1.0,
+            ).chain(CurveTween(curve: AppMotion.emphasizedCurve));
 
-           var tween = Tween(
-             begin: 0.5,
-             end: 1.0,
-           ).chain(CurveTween(curve: curve));
-
-           return ScaleTransition(
-             scale: animation.drive(tween),
-             child: FadeTransition(opacity: animation, child: child),
-           );
-         },
-       );
+            return ScaleTransition(
+              scale: animation.drive(tween),
+              child: FadeTransition(opacity: animation, child: child),
+            );
+          },
+        );
 }
 
 /// Hero动画辅助组件
@@ -87,9 +85,9 @@ class HeroDialogRoute<T> extends PageRoute<T> {
 
   HeroDialogRoute({
     required this.builder,
-    RouteSettings? settings,
-    bool fullscreenDialog = false,
-  }) : super(settings: settings, fullscreenDialog: fullscreenDialog);
+    super.settings,
+    super.fullscreenDialog = false,
+  });
 
   @override
   bool get opaque => false;
@@ -98,7 +96,7 @@ class HeroDialogRoute<T> extends PageRoute<T> {
   bool get barrierDismissible => true;
 
   @override
-  Duration get transitionDuration => const Duration(milliseconds: 300);
+  Duration get transitionDuration => AppMotion.page;
 
   @override
   bool get maintainState => true;

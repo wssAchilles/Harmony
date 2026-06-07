@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
-import 'main_navigation.dart';
+import 'package:provider/provider.dart';
+
+import '../controllers/auth_controller.dart';
+import '../ui/motion/motion.dart';
+import '../ui/widgets/async_action_button.dart';
 
 /// 注册界面 - 简洁友好的设计
 class RegisterScreen extends StatefulWidget {
@@ -16,7 +19,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _nameController = TextEditingController();
-  bool _isLoading = false;
+  AsyncActionState _actionState = AsyncActionState.idle;
 
   @override
   void dispose() {
@@ -31,38 +34,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _actionState = AsyncActionState.loading);
 
     try {
-      await AuthService().signUp(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        fullName: _nameController.text.trim(),
-      );
+      await context.read<AuthController>().signUp(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+            fullName: _nameController.text.trim(),
+          );
 
       if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const MainNavigationScreen()),
-          (route) => false,
-        );
+        setState(() => _actionState = AsyncActionState.success);
+        await Future<void>.delayed(AppMotion.fast);
+        if (!mounted) return;
+        Navigator.pop(context);
       }
     } catch (error) {
       if (mounted) {
+        setState(() => _actionState = AsyncActionState.error);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_getErrorMessage(error.toString())),
             backgroundColor: Colors.red,
           ),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        await Future<void>.delayed(AppMotion.slow);
+        if (mounted) {
+          setState(() => _actionState = AsyncActionState.idle);
+        }
       }
     }
   }
@@ -226,35 +225,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const SizedBox(height: 32),
 
                   // 注册按钮
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _handleRegister,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text(
-                              '注 册',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                    ),
+                  AsyncActionButton(
+                    onPressed: _handleRegister,
+                    label: '注 册',
+                    icon: Icons.person_add_outlined,
+                    state: _actionState,
+                    successLabel: '已创建',
+                    errorLabel: '注册失败',
                   ),
                   const SizedBox(height: 16),
 

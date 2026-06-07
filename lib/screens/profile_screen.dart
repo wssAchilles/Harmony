@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/app_exception.dart';
 import '../services/borrow_service.dart';
 import '../models/borrow_record.dart';
 import '../services/auth_service.dart';
+import '../controllers/auth_controller.dart';
+import '../ui/widgets/empty_state_view.dart';
+import '../ui/widgets/section_card.dart';
+import '../ui/widgets/status_chip.dart';
+import '../utils/app_logger.dart';
 import 'category_management_screen.dart';
 import 'profile_view_state.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({Key? key}) : super(key: key);
+  const ProfileScreen({super.key});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -59,41 +65,48 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Future<void> _loadUserData() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
 
     try {
-      await _authService.initializeUserState();
-      if (_authService.currentUserId != null) {
-        _userId = _authService.currentUserId;
-        _userEmail = _authService.currentUserEmail;
+      final auth = context.read<AuthController>();
+      await auth.refreshProfile();
+      if (!mounted) return;
+      if (auth.currentUserId != null) {
+        _userId = auth.currentUserId;
+        _userEmail = auth.currentUserEmail;
 
         setState(() {
-          _userName =
-              _authService.currentProfile?.fullName ?? _authService.displayName;
+          _userName = auth.currentProfile?.fullName ?? auth.displayName;
           _nameController.text = _userName ?? '';
         });
 
         await _loadBorrowSummary();
       }
     } catch (e) {
-      print('加载用户数据失败: $e');
+      AppLogger.warning('加载用户数据失败: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _loadBorrowSummary() async {
+    final userId = _userId;
+    if (userId == null) return;
+
     try {
-      final records = (await _borrowService.getTeacherBorrowHistory(
-        _userId!,
-      ))
+      final records = (await _borrowService.getTeacherBorrowHistory(userId))
           .where((record) => record.returnDate == null)
           .toList();
+      if (!mounted) return;
       setState(() {
         _borrowSummary = ProfileBorrowSummary(activeBorrows: records);
       });
     } catch (e) {
-      print('加载借阅记录失败: $e');
+      AppLogger.warning('加载借阅记录失败: $e');
+      if (!mounted) return;
       setState(() {
         _borrowSummary = const ProfileBorrowSummary.empty();
       });
@@ -107,7 +120,10 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
 
     try {
-      await _authService.updateProfile(fullName: _nameController.text.trim());
+      await context.read<AuthController>().updateProfile(
+            fullName: _nameController.text.trim(),
+          );
+      if (!mounted) return;
       setState(() {
         _userName = _nameController.text.trim();
       });
@@ -134,6 +150,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         oldPassword: _currentPasswordController.text,
         newPassword: _newPasswordController.text,
       );
+      if (!mounted) return;
 
       _currentPasswordController.clear();
       _newPasswordController.clear();
@@ -150,13 +167,16 @@ class _ProfileScreenState extends State<ProfileScreen>
     try {
       await _borrowService.returnBook(recordId);
       await _loadBorrowSummary();
+      if (!mounted) return;
       _showSnackBar('还书成功', isError: false);
     } catch (e) {
+      if (!mounted) return;
       _showSnackBar('还书失败: ${messageForError(e)}');
     }
   }
 
   void _showSnackBar(String message, {bool isError = true}) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -187,9 +207,11 @@ class _ProfileScreenState extends State<ProfileScreen>
     );
 
     if (confirmed == true) {
+      if (!mounted) return;
       try {
-        await _authService.signOut();
+        await context.read<AuthController>().signOut();
       } catch (e) {
+        if (!mounted) return;
         _showSnackBar('退出失败: ${messageForError(e)}');
       }
     }
@@ -241,6 +263,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildProfileCard() {
+    final auth = context.watch<AuthController>();
+    final displayName = auth.displayName;
+    final email = auth.currentUserEmail ?? _userEmail ?? '';
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -260,9 +285,11 @@ class _ProfileScreenState extends State<ProfileScreen>
               radius: 50,
               backgroundColor: Colors.white,
               child: Text(
-                _userName?.isNotEmpty == true
-                    ? _userName![0].toUpperCase()
-                    : _userEmail?[0].toUpperCase() ?? 'U',
+                displayName.isNotEmpty
+                    ? displayName[0].toUpperCase()
+                    : email.isNotEmpty
+                        ? email[0].toUpperCase()
+                        : 'U',
                 style: TextStyle(
                   fontSize: 36,
                   fontWeight: FontWeight.bold,
@@ -272,7 +299,7 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
             const SizedBox(height: 16),
             Text(
-              _userName ?? '未设置姓名',
+              displayName,
               style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -281,10 +308,10 @@ class _ProfileScreenState extends State<ProfileScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              _userEmail ?? '',
+              email,
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withAlpha(230),
               ),
             ),
           ],
@@ -294,128 +321,112 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildAccountInfoCard() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.person, color: Colors.blue.shade600),
-                const SizedBox(width: 8),
-                const Text(
-                  '账户信息',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
+    final auth = context.watch<AuthController>();
+    return SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.person, color: Colors.blue.shade600),
+              const SizedBox(width: 8),
+              const Text(
+                '账户信息',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('姓名'),
+            subtitle: Text(auth.displayName),
+            trailing: IconButton(
+              icon: const Icon(Icons.edit, size: 20),
+              onPressed: () {
+                _showEditNameDialog();
+              },
             ),
-            const Divider(height: 24),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('姓名'),
-              subtitle: Text(_userName ?? '未设置'),
-              trailing: IconButton(
-                icon: const Icon(Icons.edit, size: 20),
-                onPressed: () {
-                  _showEditNameDialog();
-                },
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('邮箱'),
+            subtitle: Text(auth.currentUserEmail ?? ''),
+            trailing: const Icon(Icons.email, size: 20, color: Colors.grey),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('角色'),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: StatusChip(
+                  label: auth.roleDisplayName,
+                  backgroundColor:
+                      auth.isAdmin ? Colors.red[50]! : Colors.green[50]!,
+                  foregroundColor:
+                      auth.isAdmin ? Colors.red[700]! : Colors.green[700]!,
+                  icon:
+                      auth.isAdmin ? Icons.admin_panel_settings : Icons.school,
+                ),
               ),
             ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('邮箱'),
-              subtitle: Text(_userEmail ?? ''),
-              trailing: const Icon(Icons.email, size: 20, color: Colors.grey),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildMyBorrowsCard() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.book, color: Colors.orange.shade600),
-                const SizedBox(width: 8),
-                const Text(
-                  '我的借阅',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade100,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${_borrowSummary.totalQuantity} 本',
-                    style: TextStyle(
-                      color: Colors.orange.shade700,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
+    return SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.book, color: Colors.orange.shade600),
+              const SizedBox(width: 8),
+              const Text(
+                '我的借阅',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const Spacer(),
+              StatusChip(
+                label: '${_borrowSummary.totalQuantity} 本',
+                backgroundColor: Colors.orange.shade100,
+                foregroundColor: Colors.orange.shade700,
+                icon: Icons.menu_book,
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+          if (_borrowSummary.activeBorrows.isEmpty)
+            const EmptyStateView(
+              icon: Icons.book_outlined,
+              title: '您当前没有借阅的图书',
+            )
+          else
+            ...List.generate(
+              _borrowSummary.activeBorrows.length > 3
+                  ? 3
+                  : _borrowSummary.activeBorrows.length,
+              (index) => _buildBorrowItem(
+                _borrowSummary.activeBorrows[index],
+              ),
             ),
-            const Divider(height: 24),
-            if (_borrowSummary.activeBorrows.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 32),
-                child: Center(
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.book_outlined,
-                        size: 48,
-                        color: Colors.grey[300],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '您当前没有借阅的图书',
-                        style: TextStyle(color: Colors.grey[500], fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            else
-              ...List.generate(
-                _borrowSummary.activeBorrows.length > 3
-                    ? 3
-                    : _borrowSummary.activeBorrows.length,
-                (index) => _buildBorrowItem(
-                  _borrowSummary.activeBorrows[index],
+          if (_borrowSummary.activeBorrows.length > 3)
+            Center(
+              child: TextButton(
+                onPressed: () {
+                  _showAllBorrowsDialog();
+                },
+                child: Text(
+                  '查看全部 ${_borrowSummary.activeBorrows.length} 本',
                 ),
               ),
-            if (_borrowSummary.activeBorrows.length > 3)
-              Center(
-                child: TextButton(
-                  onPressed: () {
-                    _showAllBorrowsDialog();
-                  },
-                  child: Text(
-                    '查看全部 ${_borrowSummary.activeBorrows.length} 本',
-                  ),
-                ),
-              ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -556,59 +567,54 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildSecurityCard() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.security, color: Colors.green.shade600),
-                const SizedBox(width: 8),
-                const Text(
-                  '安全设置',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    return SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.security, color: Colors.green.shade600),
+              const SizedBox(width: 8),
+              const Text(
+                '安全设置',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.category),
+            title: const Text('分类管理'),
+            subtitle: const Text('管理图书分类，添加、编辑或删除分类'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CategoryManagementScreen(),
                 ),
-              ],
-            ),
-            const Divider(height: 24),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.category),
-              title: const Text('分类管理'),
-              subtitle: const Text('管理图书分类，添加、编辑或删除分类'),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CategoryManagementScreen(),
-                  ),
-                );
-              },
-            ),
-            const Divider(height: 16),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.lock),
-              title: const Text('修改密码'),
-              subtitle: const Text('定期更改密码以保护账户安全'),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () {
-                _showChangePasswordDialog();
-              },
-            ),
-          ],
-        ),
+              );
+            },
+          ),
+          const Divider(height: 16),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.lock),
+            title: const Text('修改密码'),
+            subtitle: const Text('定期更改密码以保护账户安全'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () {
+              _showChangePasswordDialog();
+            },
+          ),
+        ],
       ),
     );
   }
 
   void _showEditNameDialog() {
-    _nameController.text = _userName ?? '';
+    _nameController.text = context.read<AuthController>().displayName;
     showDialog(
       context: context,
       builder: (BuildContext context) {

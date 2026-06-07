@@ -47,7 +47,7 @@ class _BorrowQuantityDialogState extends State<BorrowQuantityDialog> {
           const SizedBox(height: 16),
           Row(
             children: [
-              Flexible(
+              const Flexible(
                 child: Text(
                   '借阅数量：',
                   style: TextStyle(

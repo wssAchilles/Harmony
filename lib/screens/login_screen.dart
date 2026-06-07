@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
+import 'package:provider/provider.dart';
+
+import '../controllers/auth_controller.dart';
+import '../ui/motion/motion.dart';
+import '../ui/widgets/async_action_button.dart';
 import 'register_screen.dart';
 
 /// 登录界面 - 简洁友好的设计
@@ -14,7 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isLoading = false;
+  AsyncActionState _actionState = AsyncActionState.idle;
 
   @override
   void dispose() {
@@ -27,36 +31,33 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _actionState = AsyncActionState.loading);
 
     try {
-      await AuthService().signIn(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
+      await context.read<AuthController>().signIn(
+            email: _emailController.text.trim(),
+            password: _passwordController.text,
+          );
+      if (!mounted) return;
+      setState(() => _actionState = AsyncActionState.success);
 
       // 登录成功后，AuthGate会自动处理导航
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('登录成功！'), backgroundColor: Colors.green),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('登录成功！'), backgroundColor: Colors.green),
+      );
     } catch (error) {
       if (mounted) {
+        setState(() => _actionState = AsyncActionState.error);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_getErrorMessage(error.toString())),
             backgroundColor: Colors.red,
           ),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        await Future<void>.delayed(AppMotion.slow);
+        if (mounted) {
+          setState(() => _actionState = AsyncActionState.idle);
+        }
       }
     }
   }
@@ -156,35 +157,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 32),
 
                   // 登录按钮
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _handleLogin,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text(
-                              '登 录',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                    ),
+                  AsyncActionButton(
+                    onPressed: _handleLogin,
+                    label: '登 录',
+                    icon: Icons.login,
+                    state: _actionState,
+                    successLabel: '已登录',
+                    errorLabel: '登录失败',
                   ),
                   const SizedBox(height: 24),
 

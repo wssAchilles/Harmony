@@ -1,51 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../services/auth_service.dart';
+import '../controllers/auth_controller.dart';
 import 'login_screen.dart';
 import 'main_navigation.dart';
 
 /// 认证网关 - App 的入口
-class AuthGate extends StatefulWidget {
-  const AuthGate({super.key});
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key, this.mainNavigationBuilder});
 
-  @override
-  State<AuthGate> createState() => _AuthGateState();
-}
-
-class _AuthGateState extends State<AuthGate> {
-  final AuthService _authService = AuthService();
-  late Future<void> _initialAuthState;
-
-  @override
-  void initState() {
-    super.initState();
-    _initialAuthState = _authService.initializeUserState();
-  }
+  final WidgetBuilder? mainNavigationBuilder;
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<void>(
-      future: _initialAuthState,
-      builder: (context, initSnapshot) {
-        if (initSnapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoading();
-        }
+    final auth = context.watch<AuthController>();
+    if (auth.isInitializing) {
+      return _buildLoading();
+    }
 
-        return StreamBuilder<bool>(
-          stream: _authService.authStateChanges,
-          initialData: _authService.isLoggedIn,
-          builder: (context, snapshot) {
-            final isLoggedIn = snapshot.data ?? _authService.isLoggedIn;
-            if (!isLoggedIn) {
-              _authService.onUserLoggedOut();
-              return const LoginScreen();
-            }
+    if (auth.errorMessage != null && !auth.isLoggedIn) {
+      return _buildError(context, auth.errorMessage!);
+    }
 
-            return const MainNavigationScreen();
-          },
-        );
-      },
-    );
+    if (!auth.isLoggedIn) {
+      return const LoginScreen();
+    }
+
+    return mainNavigationBuilder?.call(context) ?? const MainNavigationScreen();
   }
 
   Widget _buildLoading() {
@@ -64,6 +45,40 @@ class _AuthGateState extends State<AuthGate> {
               style: TextStyle(color: Colors.green[700], fontSize: 16),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildError(BuildContext context, String message) {
+    return Scaffold(
+      backgroundColor: Colors.green[50],
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, size: 56, color: Colors.red[400]),
+              const SizedBox(height: 16),
+              const Text(
+                '初始化失败',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey[700]),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: () => context.read<AuthController>().initialize(),
+                icon: const Icon(Icons.refresh),
+                label: const Text('重试'),
+              ),
+            ],
+          ),
         ),
       ),
     );
