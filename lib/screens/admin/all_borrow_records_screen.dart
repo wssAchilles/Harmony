@@ -347,32 +347,58 @@ class _AllBorrowRecordsScreenState extends State<AllBorrowRecordsScreen> {
             if (thumbWidth < 32) thumbWidth = 32;
             if (thumbWidth > trackWidth) thumbWidth = trackWidth;
             final left = (trackWidth - thumbWidth) * scrollFraction;
+            final thumbTravel = trackWidth - thumbWidth;
 
-            return SizedBox(
-              height: 6,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: color.withAlpha(32),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
+            void scrollToLocalOffset(double localDx) {
+              if (thumbTravel <= 0) return;
+              final nextFraction =
+                  ((localDx - thumbWidth / 2) / thumbTravel).clamp(0.0, 1.0);
+              final nextPixels = nextFraction * position.maxScrollExtent;
+              controller.jumpTo(nextPixels);
+            }
+
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (details) {
+                scrollToLocalOffset(details.localPosition.dx);
+              },
+              onHorizontalDragStart: (details) {
+                scrollToLocalOffset(details.localPosition.dx);
+              },
+              onHorizontalDragUpdate: (details) {
+                scrollToLocalOffset(details.localPosition.dx);
+              },
+              child: SizedBox(
+                height: 20,
+                child: Center(
+                  child: SizedBox(
+                    height: 6,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: color.withAlpha(32),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          left: left,
+                          top: 0,
+                          bottom: 0,
+                          width: thumbWidth,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: color.withAlpha(180),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Positioned(
-                    left: left,
-                    top: 0,
-                    bottom: 0,
-                    width: thumbWidth,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: color.withAlpha(180),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             );
           },
