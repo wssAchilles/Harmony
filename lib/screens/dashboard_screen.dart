@@ -8,6 +8,7 @@ import '../controllers/dashboard_controller.dart';
 import '../screens/overdue_records_screen.dart';
 import '../screens/due_soon_records_screen.dart';
 import '../screens/admin/all_borrow_records_screen.dart';
+import '../screens/class_reading_report_screen.dart';
 import 'package:intl/intl.dart';
 import '../utils/page_transitions.dart';
 import '../ui/motion/motion.dart';
@@ -90,6 +91,13 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
+  void _openClassReadingReport() {
+    Navigator.push(
+      context,
+      SlidePageRoute(page: const ClassReadingReportScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasAdminAccess = context.select<AuthController, bool>(
@@ -125,6 +133,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                             floating: false,
                             pinned: true,
                             backgroundColor: Colors.blue.shade600,
+                            actions: [
+                              IconButton(
+                                icon: const Icon(Icons.assignment_outlined),
+                                tooltip: '班级阅读报告',
+                                onPressed: _openClassReadingReport,
+                              ),
+                            ],
                             flexibleSpace: FlexibleSpaceBar(
                               title: const Text(
                                 '图书馆仪表盘',

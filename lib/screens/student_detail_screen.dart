@@ -5,6 +5,7 @@ import '../models/student.dart';
 import '../models/borrow_record.dart';
 import '../services/borrow_service.dart';
 import 'add_edit_student_screen.dart';
+import 'student_reading_report_screen.dart';
 import '../utils/page_transitions.dart';
 import 'package:intl/intl.dart';
 
@@ -159,6 +160,15 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
     }
   }
 
+  void _openReadingReport() {
+    Navigator.push(
+      context,
+      SlidePageRoute(
+        page: StudentReadingReportScreen(student: widget.student),
+      ),
+    );
+  }
+
   void _showSnackBar(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(
@@ -174,6 +184,11 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
         title: Text(widget.student.fullName),
         backgroundColor: Colors.blue.shade600,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.assessment_outlined),
+            onPressed: _openReadingReport,
+            tooltip: '阅读报告',
+          ),
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: _editStudent,
@@ -314,9 +329,18 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
               children: [
                 Icon(Icons.insights, color: Colors.blue.shade600),
                 const SizedBox(width: 8),
-                const Text(
-                  '阅读偏好报告',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                const Expanded(
+                  child: Text(
+                    '阅读偏好报告',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _openReadingReport,
+                  icon: const Icon(Icons.open_in_new, size: 16),
+                  label: const Text('完整报告'),
                 ),
               ],
             ),

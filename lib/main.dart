@@ -49,6 +49,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.green,
         // 优化Material 3主题
         useMaterial3: true,
+        splashFactory: InkRipple.splashFactory,
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         // 设置输入框主题
         inputDecorationTheme: InputDecorationTheme(

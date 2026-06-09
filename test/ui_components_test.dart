@@ -10,7 +10,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(
+      _testApp(
         home: Scaffold(
           body: AsyncActionButton(onPressed: () {}, label: '提交'),
         ),
@@ -20,8 +20,8 @@ void main() {
     expect(find.text('提交'), findsOneWidget);
 
     await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(
+      _testApp(
+        home: const Scaffold(
           body: AsyncActionButton(
             onPressed: null,
             label: '提交',
@@ -37,7 +37,7 @@ void main() {
 
   testWidgets('StatusChip updates label and colors', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
+      _testApp(
         home: Scaffold(
           body: StatusChip(
             label: '可借',
@@ -51,7 +51,7 @@ void main() {
     expect(find.text('可借'), findsOneWidget);
 
     await tester.pumpWidget(
-      MaterialApp(
+      _testApp(
         home: Scaffold(
           body: StatusChip(
             label: '全部借出',
@@ -71,7 +71,7 @@ void main() {
   ) async {
     var taps = 0;
     await tester.pumpWidget(
-      MaterialApp(
+      _testApp(
         home: Scaffold(
           body: SectionCard(
             onTap: () => taps += 1,
@@ -92,7 +92,7 @@ void main() {
   testWidgets('ErrorStateView shows retry action', (tester) async {
     var retries = 0;
     await tester.pumpWidget(
-      MaterialApp(
+      _testApp(
         home: Scaffold(
           body: ErrorStateView(
             title: '加载失败',
@@ -111,4 +111,14 @@ void main() {
 
     expect(retries, 1);
   });
+}
+
+Widget _testApp({required Widget home}) {
+  return MaterialApp(
+    theme: ThemeData(
+      useMaterial3: true,
+      splashFactory: InkRipple.splashFactory,
+    ),
+    home: home,
+  );
 }

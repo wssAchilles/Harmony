@@ -19,7 +19,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider<AuthController>.value(
         value: _TestAuthController(),
-        child: MaterialApp(
+        child: _testApp(
           home: AuthGate(
             mainNavigationBuilder: (_) => const MainNavigationScreen(
               pages: [
@@ -42,7 +42,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider<AuthController>.value(
         value: _ErrorAuthController(),
-        child: const MaterialApp(home: AuthGate()),
+        child: _testApp(home: const AuthGate()),
       ),
     );
 
@@ -54,8 +54,8 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider<AuthController>.value(
         value: _TestAuthController(),
-        child: const MaterialApp(
-          home: MainNavigationScreen(
+        child: _testApp(
+          home: const MainNavigationScreen(
             pages: [
               Center(child: Text('仪表盘页')),
               _FakeSearchTab(),
@@ -83,6 +83,16 @@ void main() {
 
     expect(tester.widget<TextField>(searchField).controller?.text, '小熊');
   });
+}
+
+Widget _testApp({required Widget home}) {
+  return MaterialApp(
+    theme: ThemeData(
+      useMaterial3: true,
+      splashFactory: InkRipple.splashFactory,
+    ),
+    home: home,
+  );
 }
 
 class _TestAuthController extends AuthController {
