@@ -10,6 +10,7 @@ import '../ui/widgets/section_card.dart';
 import '../ui/widgets/status_chip.dart';
 import '../utils/app_logger.dart';
 import 'category_management_screen.dart';
+import 'borrow_reminder_settings_screen.dart';
 import 'profile_view_state.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -584,6 +585,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   Widget _buildSecurityCard() {
+    final auth = context.watch<AuthController>();
     return SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -614,6 +616,24 @@ class _ProfileScreenState extends State<ProfileScreen>
               );
             },
           ),
+          if (auth.isAdmin) ...[
+            const Divider(height: 16),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.event_available),
+              title: const Text('借阅提醒设置'),
+              subtitle: const Text('配置即将到期阈值和默认提醒时间'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const BorrowReminderSettingsScreen(),
+                  ),
+                );
+              },
+            ),
+          ],
           const Divider(height: 16),
           ListTile(
             contentPadding: EdgeInsets.zero,

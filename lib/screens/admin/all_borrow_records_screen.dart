@@ -21,6 +21,7 @@ class _AllBorrowRecordsScreenState extends State<AllBorrowRecordsScreen> {
   String _selectedFilter = '全部'; // 全部、已归还、未归还、即将到期、逾期
 
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _filterScrollController = ScrollController();
 
   @override
   void initState() {
@@ -31,6 +32,7 @@ class _AllBorrowRecordsScreenState extends State<AllBorrowRecordsScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _filterScrollController.dispose();
     super.dispose();
   }
 
@@ -63,10 +65,14 @@ class _AllBorrowRecordsScreenState extends State<AllBorrowRecordsScreen> {
       'due_date': record.dueDate?.toIso8601String(),
       'return_date': record.returnDate?.toIso8601String(),
       'quantity': record.quantity,
+      'reminder_days_before': record.reminderDaysBefore,
       'books': {'title': record.bookTitle, 'author': record.bookAuthor},
       'students': record.studentId == null
           ? null
-          : {'full_name': record.studentName, 'class_name': null},
+          : {
+              'full_name': record.studentName,
+              'class_name': record.studentClassName,
+            },
       'borrower_profile': record.profileId == null
           ? null
           : {'full_name': record.borrowerTeacherName ?? record.teacherName},
@@ -271,27 +277,107 @@ class _AllBorrowRecordsScreenState extends State<AllBorrowRecordsScreen> {
           const SizedBox(height: 12),
 
           // 状态筛选
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: ['全部', '已归还', '未归还', '即将到期', '逾期'].map((filter) {
-                final isSelected = _selectedFilter == filter;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: FilterChip(
-                    label: Text(filter),
-                    selected: isSelected,
-                    onSelected: (_) {
-                      setState(() => _selectedFilter = filter);
-                      _applyFilters();
-                    },
+          Column(
+            children: [
+              SizedBox(
+                height: 48,
+                child: SingleChildScrollView(
+                  controller: _filterScrollController,
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: ['全部', '已归还', '未归还', '即将到期', '逾期'].map((filter) {
+                      final isSelected = _selectedFilter == filter;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilterChip(
+                          label: Text(
+                            filter,
+                            maxLines: 1,
+                            overflow: TextOverflow.visible,
+                          ),
+                          selected: isSelected,
+                          onSelected: (_) {
+                            setState(() => _selectedFilter = filter);
+                            _applyFilters();
+                          },
+                        ),
+                      );
+                    }).toList(),
                   ),
-                );
-              }).toList(),
-            ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              _buildHorizontalScrollIndicator(
+                controller: _filterScrollController,
+                color: Colors.deepPurple,
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildHorizontalScrollIndicator({
+    required ScrollController controller,
+    required Color color,
+  }) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        if (!controller.hasClients) {
+          return const SizedBox(height: 6);
+        }
+
+        final position = controller.position;
+        if (!position.hasContentDimensions || position.maxScrollExtent <= 0) {
+          return const SizedBox(height: 6);
+        }
+
+        final viewportWidth = position.viewportDimension;
+        final contentWidth = viewportWidth + position.maxScrollExtent;
+        final thumbFraction = (viewportWidth / contentWidth).clamp(0.12, 1.0);
+        final scrollFraction =
+            (position.pixels / position.maxScrollExtent).clamp(0.0, 1.0);
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final trackWidth = constraints.maxWidth;
+            var thumbWidth = trackWidth * thumbFraction;
+            if (thumbWidth < 32) thumbWidth = 32;
+            if (thumbWidth > trackWidth) thumbWidth = trackWidth;
+            final left = (trackWidth - thumbWidth) * scrollFraction;
+
+            return SizedBox(
+              height: 6,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: color.withAlpha(32),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: left,
+                    top: 0,
+                    bottom: 0,
+                    width: thumbWidth,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: color.withAlpha(180),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -349,6 +435,14 @@ class _AllBorrowRecordsScreenState extends State<AllBorrowRecordsScreen> {
             if (record['due_date'] != null)
               _buildInfoRow('应还日期', _formatDate(record['due_date'])),
 
+            _buildInfoRow(
+              '提醒时间',
+              record['reminder_days_before'] == null ||
+                      record['reminder_days_before'] == 0
+                  ? '使用默认设置'
+                  : '提前 ${record['reminder_days_before']} 天',
+            ),
+
             if (record['return_date'] != null)
               _buildInfoRow('实还日期', _formatDate(record['return_date'])),
 
@@ -389,7 +483,10 @@ class _AllBorrowRecordsScreenState extends State<AllBorrowRecordsScreen> {
     }
     final dueDate = DateTime.parse(record['due_date']);
     final now = DateTime.now();
+    final rawReminderDays = record['reminder_days_before'] as int?;
+    final reminderDays =
+        rawReminderDays == null || rawReminderDays <= 0 ? 3 : rawReminderDays;
     if (dueDate.isBefore(now)) return false;
-    return !dueDate.isAfter(now.add(const Duration(days: 3)));
+    return !dueDate.isAfter(now.add(Duration(days: reminderDays)));
   }
 }

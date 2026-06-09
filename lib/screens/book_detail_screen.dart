@@ -4,6 +4,7 @@ import '../models/student.dart';
 import '../models/borrow_record.dart';
 import '../services/app_exception.dart';
 import '../services/book_service.dart';
+import '../services/borrow_reminder_settings_service.dart';
 import '../services/student_service.dart';
 import '../services/borrow_service.dart';
 import 'add_edit_book_screen.dart';
@@ -24,6 +25,7 @@ class BookDetailScreen extends StatefulWidget {
 
 class _BookDetailScreenState extends State<BookDetailScreen> {
   final _bookService = BookService();
+  final _reminderSettingsService = BorrowReminderSettingsService();
   final _studentService = StudentService();
   final _borrowService = BorrowService();
 
@@ -190,10 +192,12 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final reminderSettings = await _reminderSettingsService.getSettings();
       await _borrowService.borrowBookToStudent(
         book: _currentBook,
         student: student,
         quantity: result.quantity,
+        reminderDaysBefore: reminderSettings.studentReminderDays,
       );
 
       if (mounted) {
@@ -238,9 +242,11 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final reminderSettings = await _reminderSettingsService.getSettings();
       await _borrowService.borrowBookToTeacher(
         book: _currentBook,
         quantity: result.quantity,
+        reminderDaysBefore: reminderSettings.teacherReminderDays,
       );
 
       if (mounted) {
@@ -701,6 +707,12 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
         _buildBorrowInfoRow(
           '应还日期',
           dueDate != null ? _formatDate(dueDate) : '未设置',
+        ),
+        _buildBorrowInfoRow(
+          '提醒时间',
+          record.reminderDaysBefore == null
+              ? '使用默认设置'
+              : '提前 ${record.reminderDaysBefore} 天',
         ),
         if (dueDate == null)
           _buildBorrowInfoRow('到期状态', '未设置应还日期')

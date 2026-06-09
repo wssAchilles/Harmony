@@ -4,17 +4,20 @@ import '../models/book.dart';
 import '../models/borrow_record.dart';
 import '../models/dashboard_data.dart';
 import 'book_service.dart';
+import 'borrow_reminder_settings_service.dart';
 import 'borrow_service.dart';
 import 'student_service.dart';
 
 class DashboardService {
   final _bookService = BookService();
   final _borrowService = BorrowService();
+  final _reminderSettingsService = BorrowReminderSettingsService();
   final _studentService = StudentService();
   DashboardSummary? _lastSummary;
   List<TopBorrowedBook>? _lastTopBooks;
   List<TopActiveStudent>? _lastTopStudents;
   List<OverdueBorrowRecordView>? _lastOverdueRecords;
+  BorrowInsights? _lastInsights;
 
   Future<int> getCurrentBorrowedCount() async {
     try {
@@ -36,10 +39,11 @@ class DashboardService {
     }
   }
 
-  Future<int> getDueSoonCount({int withinDays = 3}) async {
+  Future<int> getDueSoonCount({int? withinDays}) async {
     try {
+      final effectiveDays = withinDays ?? await _dueSoonDays();
       final records = await _borrowService.getDueSoonRecords(
-        withinDays: withinDays,
+        withinDays: effectiveDays,
       );
       return records.length;
     } catch (e) {
@@ -161,11 +165,12 @@ class DashboardService {
   }
 
   Future<List<OverdueBorrowRecordView>> getDueSoonRecords({
-    int withinDays = 3,
+    int? withinDays,
   }) async {
     try {
+      final effectiveDays = withinDays ?? await _dueSoonDays();
       final records = await _borrowService.getDueSoonRecords(
-        withinDays: withinDays,
+        withinDays: effectiveDays,
       );
       return records.map(OverdueBorrowRecordView.fromBorrowRecord).toList();
     } catch (e) {
@@ -188,6 +193,7 @@ class DashboardService {
           .where((BorrowRecord record) => record.returnDate == null)
           .toList();
       final now = DateTime.now();
+      final dueSoonDays = await _dueSoonDays();
 
       final summary = DashboardSummary(
         totalBooks: books.fold<int>(
@@ -213,7 +219,8 @@ class DashboardService {
             .length,
         dueSoonCount: activeRecords
             .where(
-              (BorrowRecord record) => record.isDueSoonAt(now, withinDays: 3),
+              (BorrowRecord record) =>
+                  record.isDueSoonAt(now, withinDays: dueSoonDays),
             )
             .length,
       );
@@ -223,6 +230,105 @@ class DashboardService {
       AppLogger.warning('获取统计摘要失败: $e');
       return _lastSummary ?? const DashboardSummary.empty();
     }
+  }
+
+  Future<BorrowInsights> getBorrowInsights() async {
+    try {
+      final records = await _borrowService.getAllBorrowRecords();
+      final insights = BorrowInsights(
+        categoryItems: _topMetricItems(
+          records,
+          (record) => record.bookCategoryName?.trim().isNotEmpty == true
+              ? record.bookCategoryName!.trim()
+              : '未分类',
+        ),
+        tagItems: _topTagItems(records),
+        monthlyTrend: _monthlyTrend(records),
+        classRankings: _topMetricItems(
+          records.where((record) => record.studentId != null),
+          (record) => record.studentClassName?.trim().isNotEmpty == true
+              ? record.studentClassName!.trim()
+              : '未分配班级',
+        ),
+      );
+      _lastInsights = insights;
+      return insights;
+    } catch (e) {
+      AppLogger.warning('获取借阅洞察失败: $e');
+      return _lastInsights ?? const BorrowInsights.empty();
+    }
+  }
+
+  Future<int> _dueSoonDays() async {
+    final settings = await _reminderSettingsService.getSettings();
+    return settings.dueSoonDays;
+  }
+
+  List<BorrowMetricItem> _topTagItems(List<BorrowRecord> records) {
+    final counts = <String, int>{};
+    for (final record in records) {
+      for (final tag in record.bookTags) {
+        final label = tag.trim();
+        if (label.isEmpty) continue;
+        counts[label] = (counts[label] ?? 0) + record.quantity;
+      }
+    }
+    return _sortedMetricItems(counts, limit: 6);
+  }
+
+  List<BorrowMetricItem> _topMetricItems(
+    Iterable<BorrowRecord> records,
+    String Function(BorrowRecord record) labelFor,
+  ) {
+    final counts = <String, int>{};
+    for (final record in records) {
+      final label = labelFor(record);
+      counts[label] = (counts[label] ?? 0) + record.quantity;
+    }
+    return _sortedMetricItems(counts, limit: 6);
+  }
+
+  List<MonthlyBorrowTrend> _monthlyTrend(List<BorrowRecord> records) {
+    final now = DateTime.now();
+    final months = List.generate(6, (index) {
+      return DateTime(now.year, now.month - (5 - index), 1);
+    });
+    final counts = {
+      for (final month in months) _monthKey(month): 0,
+    };
+    for (final record in records) {
+      final key = _monthKey(record.borrowDate);
+      if (counts.containsKey(key)) {
+        counts[key] = counts[key]! + record.quantity;
+      }
+    }
+    return months
+        .map(
+          (month) => MonthlyBorrowTrend(
+            monthLabel: '${month.month}月',
+            count: counts[_monthKey(month)] ?? 0,
+          ),
+        )
+        .toList();
+  }
+
+  List<BorrowMetricItem> _sortedMetricItems(
+    Map<String, int> counts, {
+    required int limit,
+  }) {
+    final entries = counts.entries.toList()
+      ..sort((a, b) {
+        final countCompare = b.value.compareTo(a.value);
+        return countCompare != 0 ? countCompare : a.key.compareTo(b.key);
+      });
+    return entries
+        .take(limit)
+        .map((entry) => BorrowMetricItem(label: entry.key, count: entry.value))
+        .toList();
+  }
+
+  String _monthKey(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}';
   }
 }
 

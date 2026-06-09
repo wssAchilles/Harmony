@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/dashboard_data.dart';
+import '../services/borrow_reminder_settings_service.dart';
 import '../services/dashboard_service.dart';
 import '../ui/widgets/empty_state_view.dart';
 import '../ui/widgets/section_card.dart';
@@ -16,7 +17,10 @@ class DueSoonRecordsScreen extends StatefulWidget {
 
 class _DueSoonRecordsScreenState extends State<DueSoonRecordsScreen> {
   final DashboardService _dashboardService = DashboardService();
+  final BorrowReminderSettingsService _settingsService =
+      BorrowReminderSettingsService();
   List<OverdueBorrowRecordView> _records = [];
+  int _withinDays = 3;
   bool _isLoading = true;
 
   @override
@@ -28,10 +32,12 @@ class _DueSoonRecordsScreenState extends State<DueSoonRecordsScreen> {
   Future<void> _loadRecords() async {
     setState(() => _isLoading = true);
     try {
+      final settings = await _settingsService.getSettings();
       final records = await _dashboardService.getDueSoonRecords();
       if (!mounted) return;
       setState(() {
         _records = records;
+        _withinDays = settings.dueSoonDays;
         _isLoading = false;
       });
     } catch (e) {
@@ -59,10 +65,10 @@ class _DueSoonRecordsScreenState extends State<DueSoonRecordsScreen> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _records.isEmpty
-                ? const EmptyStateView(
+                ? EmptyStateView(
                     icon: Icons.event_available,
                     title: '暂无即将到期的图书',
-                    message: '3天内到期的未还图书会显示在这里',
+                    message: '$_withinDays天内到期的未还图书会显示在这里',
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),

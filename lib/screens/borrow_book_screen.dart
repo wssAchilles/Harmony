@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/book.dart';
 import '../models/student.dart';
+import '../services/borrow_reminder_settings_service.dart';
 import '../services/borrow_service.dart';
 import '../services/student_service.dart';
 import '../ui/widgets/async_action_button.dart';
@@ -18,11 +19,14 @@ class BorrowBookScreen extends StatefulWidget {
 
 class _BorrowBookScreenState extends State<BorrowBookScreen> {
   final BorrowService _borrowService = BorrowService();
+  final BorrowReminderSettingsService _reminderSettingsService =
+      BorrowReminderSettingsService();
   final StudentService _studentService = StudentService();
 
   List<Student> _students = [];
   Student? _selectedStudent;
   DateTime? _dueDate;
+  int _reminderDaysBefore = 3;
   bool _isLoading = true;
   bool _isBorrowing = false;
   AsyncActionState _borrowActionState = AsyncActionState.idle;
@@ -30,18 +34,20 @@ class _BorrowBookScreenState extends State<BorrowBookScreen> {
   @override
   void initState() {
     super.initState();
-    _loadStudents();
+    _loadInitialData();
     _dueDate = DateTime.now().add(const Duration(days: 14)); // 默认借期14天
   }
 
-  Future<void> _loadStudents() async {
+  Future<void> _loadInitialData() async {
     setState(() => _isLoading = true);
 
     try {
       final students = await _studentService.getAllStudents();
+      final settings = await _reminderSettingsService.getSettings();
       if (!mounted) return;
       setState(() {
         _students = students;
+        _reminderDaysBefore = settings.studentReminderDays;
         _isLoading = false;
       });
     } catch (e) {
@@ -75,6 +81,7 @@ class _BorrowBookScreenState extends State<BorrowBookScreen> {
         book: widget.book,
         student: _selectedStudent!,
         borrowDays: borrowDays > 0 ? borrowDays : 1,
+        reminderDaysBefore: _reminderDaysBefore,
       );
 
       setState(() {
@@ -116,164 +123,223 @@ class _BorrowBookScreenState extends State<BorrowBookScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Padding(
               padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 图书信息卡片
-                  SectionCard(
-                    child: Row(
-                      children: [
-                        // 图书封面
-                        Container(
-                          width: 80,
-                          height: 120,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[200],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: widget.book.resolvedCoverImageUrl != null
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    widget.book.resolvedCoverImageUrl!,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return const Icon(
-                                        Icons.book,
-                                        size: 40,
-                                        color: Colors.grey,
-                                      );
-                                    },
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.book,
-                                  size: 40,
-                                  color: Colors.grey,
-                                ),
-                        ),
-                        const SizedBox(width: 16),
-
-                        // 图书信息
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                widget.book.title,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              if (widget.book.author != null) ...[
-                                Text(
-                                  '作者: ${widget.book.author}',
-                                  style: TextStyle(color: Colors.grey[600]),
-                                ),
-                                const SizedBox(height: 4),
-                              ],
-                              if (widget.book.location != null)
-                                Text(
-                                  '位置: ${widget.book.location}',
-                                  style: TextStyle(color: Colors.grey[600]),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // 选择学生
-                  const Text(
-                    '选择借阅学生',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<Student>(
-                    // ignore: deprecated_member_use
-                    value: _selectedStudent,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      hintText: '请选择学生',
-                    ),
-                    items: _students.map((student) {
-                      return DropdownMenuItem(
-                        value: student,
-                        child: Text(
-                          '${student.fullName} - ${student.className ?? "未分班"}',
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (student) {
-                      setState(() => _selectedStudent = student);
-                    },
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // 选择归还日期
-                  const Text(
-                    '预期归还日期',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  InkWell(
-                    onTap: () async {
-                      final date = await showDatePicker(
-                        context: context,
-                        initialDate: _dueDate ??
-                            DateTime.now().add(const Duration(days: 14)),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                      );
-                      if (date != null) {
-                        setState(() => _dueDate = date);
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 图书信息卡片
+                    SectionCard(
                       child: Row(
                         children: [
-                          Icon(Icons.calendar_today, color: Colors.grey[600]),
-                          const SizedBox(width: 8),
-                          Text(
-                            _dueDate != null
-                                ? '${_dueDate!.year}-${_dueDate!.month.toString().padLeft(2, '0')}-${_dueDate!.day.toString().padLeft(2, '0')}'
-                                : '选择日期',
-                            style: TextStyle(
-                              color: _dueDate != null
-                                  ? Colors.black
-                                  : Colors.grey[600],
+                          // 图书封面
+                          Container(
+                            width: 80,
+                            height: 120,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: widget.book.resolvedCoverImageUrl != null
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      widget.book.resolvedCoverImageUrl!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                        return const Icon(
+                                          Icons.book,
+                                          size: 40,
+                                          color: Colors.grey,
+                                        );
+                                      },
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.book,
+                                    size: 40,
+                                    color: Colors.grey,
+                                  ),
+                          ),
+                          const SizedBox(width: 16),
+
+                          // 图书信息
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.book.title,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                if (widget.book.author != null) ...[
+                                  Text(
+                                    '作者: ${widget.book.author}',
+                                    style: TextStyle(color: Colors.grey[600]),
+                                  ),
+                                  const SizedBox(height: 4),
+                                ],
+                                if (widget.book.location != null)
+                                  Text(
+                                    '位置: ${widget.book.location}',
+                                    style: TextStyle(color: Colors.grey[600]),
+                                  ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
 
-                  const Spacer(),
+                    const SizedBox(height: 24),
 
-                  // 借阅按钮
-                  AsyncActionButton(
-                    onPressed: _isBorrowing ? null : _borrowBook,
-                    label: '确认借阅',
-                    successLabel: '借阅成功',
-                    errorLabel: '重试借阅',
-                    icon: Icons.bookmark_add_outlined,
-                    state: _borrowActionState,
-                  ),
-                ],
+                    // 选择学生
+                    const Text(
+                      '选择借阅学生',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<Student>(
+                      // ignore: deprecated_member_use
+                      value: _selectedStudent,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        hintText: '请选择学生',
+                      ),
+                      items: _students.map((student) {
+                        return DropdownMenuItem(
+                          value: student,
+                          child: Text(
+                            '${student.fullName} - ${student.className ?? "未分班"}',
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (student) {
+                        setState(() => _selectedStudent = student);
+                      },
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // 选择归还日期
+                    const Text(
+                      '预期归还日期',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () async {
+                        final date = await showDatePicker(
+                          context: context,
+                          initialDate: _dueDate ??
+                              DateTime.now().add(const Duration(days: 14)),
+                          firstDate: DateTime.now(),
+                          lastDate:
+                              DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (date != null) {
+                          setState(() => _dueDate = date);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_today, color: Colors.grey[600]),
+                            const SizedBox(width: 8),
+                            Text(
+                              _dueDate != null
+                                  ? '${_dueDate!.year}-${_dueDate!.month.toString().padLeft(2, '0')}-${_dueDate!.day.toString().padLeft(2, '0')}'
+                                  : '选择日期',
+                              style: TextStyle(
+                                color: _dueDate != null
+                                    ? Colors.black
+                                    : Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    _buildReminderStepper(),
+
+                    const SizedBox(height: 24),
+
+                    // 借阅按钮
+                    AsyncActionButton(
+                      onPressed: _isBorrowing ? null : _borrowBook,
+                      label: '确认借阅',
+                      successLabel: '借阅成功',
+                      errorLabel: '重试借阅',
+                      icon: Icons.bookmark_add_outlined,
+                      state: _borrowActionState,
+                    ),
+                  ],
+                ),
               ),
             ),
+    );
+  }
+
+  Widget _buildReminderStepper() {
+    return SectionCard(
+      child: Row(
+        children: [
+          Icon(Icons.event_available, color: Colors.amber[800]),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '提前提醒',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '到期前 $_reminderDaysBefore 天进入即将到期提醒',
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: _reminderDaysBefore <= 1
+                ? null
+                : () => setState(() => _reminderDaysBefore--),
+            icon: const Icon(Icons.remove_circle_outline),
+            tooltip: '减少提醒天数',
+          ),
+          SizedBox(
+            width: 48,
+            child: Text(
+              '$_reminderDaysBefore 天',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          IconButton(
+            onPressed: _reminderDaysBefore >= 30
+                ? null
+                : () => setState(() => _reminderDaysBefore++),
+            icon: const Icon(Icons.add_circle_outline),
+            tooltip: '增加提醒天数',
+          ),
+        ],
+      ),
     );
   }
 }

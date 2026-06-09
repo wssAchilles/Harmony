@@ -7,6 +7,7 @@ abstract class DashboardDataSource {
   Future<DashboardSummary> getDashboardSummary();
   Future<List<TopBorrowedBook>> getTopBorrowedBooks();
   Future<List<TopActiveStudent>> getTopActiveStudents();
+  Future<BorrowInsights> getBorrowInsights();
 }
 
 class DashboardServiceDataSource implements DashboardDataSource {
@@ -29,6 +30,11 @@ class DashboardServiceDataSource implements DashboardDataSource {
   Future<List<TopActiveStudent>> getTopActiveStudents() {
     return _dashboardService.getTopActiveStudents();
   }
+
+  @override
+  Future<BorrowInsights> getBorrowInsights() {
+    return _dashboardService.getBorrowInsights();
+  }
 }
 
 class DashboardController extends ChangeNotifier {
@@ -40,12 +46,14 @@ class DashboardController extends ChangeNotifier {
   DashboardSummary _summary = const DashboardSummary.empty();
   List<TopBorrowedBook> _topBooks = [];
   List<TopActiveStudent> _topStudents = [];
+  BorrowInsights _insights = const BorrowInsights.empty();
   bool _isLoading = true;
   String? _errorMessage;
 
   DashboardSummary get summary => _summary;
   List<TopBorrowedBook> get topBooks => List.unmodifiable(_topBooks);
   List<TopActiveStudent> get topStudents => List.unmodifiable(_topStudents);
+  BorrowInsights get insights => _insights;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -58,10 +66,12 @@ class DashboardController extends ChangeNotifier {
       final summary = await _dataSource.getDashboardSummary();
       final topBooks = await _dataSource.getTopBorrowedBooks();
       final topStudents = await _dataSource.getTopActiveStudents();
+      final insights = await _dataSource.getBorrowInsights();
 
       _summary = summary;
       _topBooks = topBooks;
       _topStudents = topStudents;
+      _insights = insights;
     } catch (e) {
       _errorMessage = e.toString();
     } finally {

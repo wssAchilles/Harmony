@@ -73,14 +73,23 @@ dart run tool/setup_pocketbase.dart
 
 `tool/setup_pocketbase.dart` 会删除并重建相关 collection，只适合新环境初始化或明确要从备份重建数据。
 
-已有 PocketBase 数据库只补图书字段时不要重跑 setup，请使用增量 patch：
+已有 PocketBase 数据库补新增字段时不要重跑 setup，请使用增量 patch：
 
 ```bash
 dart run tool/patch_pocketbase_schema.dart --dry-run
 dart run tool/patch_pocketbase_schema.dart
 ```
 
-增量 patch 只会给 `books` 追加缺失的 `publisher`、`isbn`、`tags`、`rating` 字段和 ISBN 索引，不会删除 collection、字段或已有记录。
+增量 patch 只会追加缺失字段或 collection：`books.publisher/isbn/tags/rating`、`borrow_records.reminder_days_before`、`app_settings` 和相关索引，不会删除 collection、字段或已有记录。
+
+填充演示数据时使用只追加/补缺失的脚本，默认 dry-run，不会删除或重建数据：
+
+```bash
+dart run tool/seed_demo_data.dart --dry-run
+dart run tool/seed_demo_data.dart --apply
+```
+
+该脚本只做幂等数据补充：创建借阅提醒设置、补幼儿园分类和图书样本、补学生借阅历史样本，并按未还记录同步新增样本书库存。它不会清库、不会修改 collection 结构。
 
 导入后的原 Supabase 用户登录密码统一为：
 
@@ -203,6 +212,16 @@ due_date date
 return_date date
 borrowed_by_user_id text
 quantity number
+reminder_days_before number
+```
+
+### `app_settings`
+
+```text
+id system text
+key text
+value json
+updated_at date
 ```
 
 借阅人关系沿用 Supabase 原语义：
@@ -215,9 +234,12 @@ quantity number
 
 - 幼儿园业务模型保持为老师代学生借阅：老师在图书详情中选择学生并办理借阅，记录同时保存 `student_id` 和 `borrowed_by_user_id`。
 - 图书信息补充出版社、ISBN、标注和 0-5 评分；图书新增/编辑、卡片、详情和搜索均支持这些字段。
-- 搜索覆盖书名、作者、出版社、ISBN、位置、分类和标注，仍使用应用内 contains 模糊匹配。
-- 应用内提醒统计 3 天内到期记录；仪表盘、即将到期列表、学生详情、个人中心和图书详情会显示即将到期、今日到期或已逾期状态。
-- 学生详情保留当前借阅和借阅历史，并展示总借阅次数、当前在借数量、即将到期数、逾期数、常借分类和常借标注。
+- 搜索覆盖书名、作者、出版社、ISBN、位置、分类和标注，支持 contains、拼音、拼音首字母和简单近似匹配；直接命中的文本会在图书卡片中高亮。
+- 图书表单支持 ISBN-10 / ISBN-13 校验、标注建议和 0.5 步进评分控件。
+- 应用内提醒支持管理员设置全局即将到期天数、学生借阅默认提醒天数和老师借阅默认提醒天数；单次借阅可保存 `reminder_days_before` 覆盖默认值。
+- 仪表盘、即将到期列表、学生详情、个人中心和图书详情会显示即将到期、今日到期或已逾期状态。
+- 学生详情保留当前借阅和借阅历史，并展示总借阅次数、当前在借数量、即将到期数、逾期数、常借分类、常借标注、分类/标注分布和月度趋势。
+- 仪表盘展示分类借阅分布、标注兴趣方向、月度借阅趋势和班级阅读排行榜，用于统计借阅历史和阅读兴趣方向。
 - 暂不接入系统通知、铃声、震动或扫码自动获取图书信息；ISBN 字段和 ISBN 搜索已作为后续扫码录入的基础。
 
 ## 验证命令

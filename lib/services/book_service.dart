@@ -4,6 +4,7 @@ import '../utils/app_logger.dart';
 import 'package:pocketbase/pocketbase.dart';
 
 import '../models/book.dart';
+import '../utils/search_matcher.dart';
 import 'app_exception.dart';
 import 'auth_service.dart';
 import 'backend/backend_gateway.dart';
@@ -117,13 +118,7 @@ class BookService {
       final books = await getBooksWithCategories();
       if (keyword.isEmpty) return books;
       return books.where((book) {
-        return book.title.toLowerCase().contains(keyword) ||
-            (book.author?.toLowerCase() ?? '').contains(keyword) ||
-            (book.publisher?.toLowerCase() ?? '').contains(keyword) ||
-            (book.isbn?.toLowerCase() ?? '').contains(keyword) ||
-            (book.location?.toLowerCase() ?? '').contains(keyword) ||
-            (book.categoryName?.toLowerCase() ?? '').contains(keyword) ||
-            book.tags.any((tag) => tag.toLowerCase().contains(keyword));
+        return SearchMatcher.matchesBook(book, keyword);
       }).toList();
     } catch (e) {
       throwServiceException('搜索图书失败', e);

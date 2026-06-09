@@ -4,6 +4,7 @@ import '../models/book.dart';
 import '../models/category.dart';
 import '../services/book_service.dart';
 import '../services/category_service.dart';
+import '../utils/search_matcher.dart';
 
 class HomeController extends ChangeNotifier {
   HomeController({
@@ -76,13 +77,7 @@ class HomeController extends ChangeNotifier {
     final query = _searchQuery.trim().toLowerCase();
     if (query.isNotEmpty) {
       filtered = filtered.where((book) {
-        return book.title.toLowerCase().contains(query) ||
-            (book.author?.toLowerCase() ?? '').contains(query) ||
-            (book.publisher?.toLowerCase() ?? '').contains(query) ||
-            (book.isbn?.toLowerCase() ?? '').contains(query) ||
-            (book.location?.toLowerCase() ?? '').contains(query) ||
-            (book.categoryName?.toLowerCase() ?? '').contains(query) ||
-            book.tags.any((tag) => tag.toLowerCase().contains(query));
+        return SearchMatcher.matchesBook(book, query);
       }).toList();
     }
 

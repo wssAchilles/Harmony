@@ -56,6 +56,46 @@ class TopActiveStudent {
   final String? className;
 }
 
+class BorrowMetricItem {
+  const BorrowMetricItem({
+    required this.label,
+    required this.count,
+  });
+
+  final String label;
+  final int count;
+}
+
+class MonthlyBorrowTrend {
+  const MonthlyBorrowTrend({
+    required this.monthLabel,
+    required this.count,
+  });
+
+  final String monthLabel;
+  final int count;
+}
+
+class BorrowInsights {
+  const BorrowInsights({
+    this.categoryItems = const [],
+    this.tagItems = const [],
+    this.monthlyTrend = const [],
+    this.classRankings = const [],
+  });
+
+  const BorrowInsights.empty()
+      : categoryItems = const [],
+        tagItems = const [],
+        monthlyTrend = const [],
+        classRankings = const [];
+
+  final List<BorrowMetricItem> categoryItems;
+  final List<BorrowMetricItem> tagItems;
+  final List<MonthlyBorrowTrend> monthlyTrend;
+  final List<BorrowMetricItem> classRankings;
+}
+
 class OverdueBorrowRecordView {
   const OverdueBorrowRecordView({
     required this.id,

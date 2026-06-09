@@ -39,12 +39,14 @@ void main() {
       'book_id': 9,
       'student_id': 1,
       'student_name': '许子祺',
+      'student_class_name': '大班A',
       'borrow_date': '2025-09-06 16:19:32.218Z',
       'borrowed_by_user_id': 'ff20d126-e22a-464c-acf5-e1db1e5b6fab',
     });
 
     expect(record.borrowerName, '许子祺');
     expect(record.borrowerType, '学生');
+    expect(record.studentClassName, '大班A');
   });
 
   test('parses book category and tags for borrowing statistics', () {
@@ -81,6 +83,39 @@ void main() {
     expect(record.daysUntilDueAt(now), 2);
     expect(record.isDueSoonAt(now), isTrue);
     expect(record.isOverdueAt(now), isFalse);
+  });
+
+  test('parses per-borrow reminder days and uses them for due soon state', () {
+    final now = DateTime(2026, 6, 9, 10);
+    final record = BorrowRecord.fromJson({
+      'id': 18,
+      'book_id': 9,
+      'student_id': 1,
+      'borrow_date': now.toIso8601String(),
+      'due_date': now.add(const Duration(days: 5)).toIso8601String(),
+      'borrowed_by_user_id': 'teacher-id',
+      'reminder_days_before': 7,
+    });
+
+    expect(record.reminderDaysBefore, 7);
+    expect(record.isDueSoonAt(now, withinDays: 3), isTrue);
+    expect(record.toJson()['reminder_days_before'], 7);
+  });
+
+  test('treats zero reminder days from old PocketBase rows as unset', () {
+    final now = DateTime(2026, 6, 9, 10);
+    final record = BorrowRecord.fromJson({
+      'id': 18,
+      'book_id': 9,
+      'student_id': 1,
+      'borrow_date': now.toIso8601String(),
+      'due_date': now.add(const Duration(days: 2)).toIso8601String(),
+      'borrowed_by_user_id': 'teacher-id',
+      'reminder_days_before': 0,
+    });
+
+    expect(record.reminderDaysBefore, isNull);
+    expect(record.isDueSoonAt(now, withinDays: 3), isTrue);
   });
 
   test('excludes records beyond exact due soon window', () {

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import '../models/student.dart';
 import '../models/borrow_record.dart';
@@ -19,6 +21,7 @@ class StudentDetailScreen extends StatefulWidget {
 class _StudentDetailScreenState extends State<StudentDetailScreen>
     with TickerProviderStateMixin {
   final BorrowService _borrowService = BorrowService();
+  final ScrollController _studentTrendScrollController = ScrollController();
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -32,6 +35,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
   int _overdueBooks = 0;
   String? _favoriteCategory;
   String? _favoriteTag;
+  List<_StudentMetricItem> _categoryStats = [];
+  List<_StudentMetricItem> _tagStats = [];
+  List<_StudentMonthlyTrend> _monthlyTrend = [];
 
   @override
   void initState() {
@@ -49,6 +55,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
 
   @override
   void dispose() {
+    _studentTrendScrollController.dispose();
     _animationController.dispose();
     super.dispose();
   }
@@ -86,6 +93,14 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
         _favoriteTag = _mostCommon(
           records.expand((record) => record.bookTags),
         );
+        _categoryStats = _metricItems(
+          records
+              .map((record) => record.bookCategoryName)
+              .whereType<String>()
+              .where((category) => category.trim().isNotEmpty),
+        );
+        _tagStats = _metricItems(records.expand((record) => record.bookTags));
+        _monthlyTrend = _buildMonthlyTrend(records);
         _isLoading = false;
       });
 
@@ -188,6 +203,13 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
                     ),
                   ),
 
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      child: _buildPreferenceReportCard(),
+                    ),
+                  ),
+
                   // 当前借阅
                   if (_currentBorrows.isNotEmpty) ...[
                     const SliverToBoxAdapter(
@@ -281,6 +303,209 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
     );
   }
 
+  Widget _buildPreferenceReportCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.insights, color: Colors.blue.shade600),
+                const SizedBox(width: 8),
+                const Text(
+                  '阅读偏好报告',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_borrowHistory.isEmpty)
+              Text(
+                '暂无借阅样本',
+                style: TextStyle(color: Colors.grey[600], fontSize: 14),
+              )
+            else ...[
+              Text(
+                '累计 ${_borrowHistory.length} 次借阅，偏好方向以分类和标注统计。',
+                style: TextStyle(color: Colors.grey[700], fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              _buildMetricBars('分类兴趣', _categoryStats, Colors.indigo),
+              const SizedBox(height: 12),
+              _buildMetricBars('标注兴趣', _tagStats, Colors.teal),
+              const SizedBox(height: 12),
+              _buildStudentTrend(),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetricBars(
+    String title,
+    List<_StudentMetricItem> items,
+    Color color,
+  ) {
+    if (items.isEmpty) {
+      return Text(
+        '$title：暂无数据',
+        style: TextStyle(color: Colors.grey[600], fontSize: 13),
+      );
+    }
+    final maxCount = items.fold<int>(
+      1,
+      (max, item) => item.count > max ? item.count : max,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        ...items.map((item) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 84,
+                  child: Text(
+                    item.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 13, color: Colors.grey[800]),
+                  ),
+                ),
+                Expanded(
+                  child: LinearProgressIndicator(
+                    value: item.count / maxCount,
+                    minHeight: 8,
+                    borderRadius: BorderRadius.circular(4),
+                    color: color,
+                    backgroundColor: color.withAlpha(28),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${item.count}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildStudentTrend() {
+    const chartHeight = 132.0;
+    const barSlotWidth = 52.0;
+    final maxCount = _monthlyTrend.fold<int>(
+      1,
+      (max, item) => item.count > max ? item.count : max,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '月度趋势',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 158,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final contentWidth = math.max(
+                constraints.maxWidth,
+                _monthlyTrend.length * barSlotWidth,
+              );
+              final hasHorizontalOverflow =
+                  _monthlyTrend.length * barSlotWidth > constraints.maxWidth;
+
+              return Scrollbar(
+                controller: _studentTrendScrollController,
+                thumbVisibility: hasHorizontalOverflow,
+                trackVisibility: hasHorizontalOverflow,
+                scrollbarOrientation: ScrollbarOrientation.bottom,
+                child: SingleChildScrollView(
+                  controller: _studentTrendScrollController,
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.only(bottom: 18),
+                  child: SizedBox(
+                    width: contentWidth,
+                    height: chartHeight,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: _monthlyTrend.map((item) {
+                        final height = 18 + item.count / maxCount * 58;
+                        return SizedBox(
+                          width: barSlotWidth,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                SizedBox(
+                                  height: 18,
+                                  child: Text(
+                                    '${item.count}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                SizedBox(
+                                  height: 76,
+                                  child: Align(
+                                    alignment: Alignment.bottomCenter,
+                                    child: Container(
+                                      width: double.infinity,
+                                      height: height,
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.shade500,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                SizedBox(
+                                  height: 20,
+                                  child: Text(
+                                    item.monthLabel,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildStudentInfoCard() {
     return Card(
       elevation: 4,
@@ -340,38 +565,49 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
           children: [
             LayoutBuilder(
               builder: (context, constraints) {
-                final columns = constraints.maxWidth >= 520 ? 4 : 2;
-                return GridView.count(
-                  crossAxisCount: columns,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: columns == 4 ? 1.15 : 1.9,
+                const spacing = 12.0;
+                final columns = constraints.maxWidth >= 560 ? 4 : 2;
+                final itemWidth =
+                    (constraints.maxWidth - spacing * (columns - 1)) / columns;
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
                   children: [
-                    _buildStatItem(
-                      '总借阅',
-                      _totalBorrows.toString(),
-                      Icons.book,
-                      Colors.blue,
+                    SizedBox(
+                      width: itemWidth,
+                      child: _buildStatItem(
+                        '总借阅',
+                        _totalBorrows.toString(),
+                        Icons.book,
+                        Colors.blue,
+                      ),
                     ),
-                    _buildStatItem(
-                      '当前在借',
-                      _currentBorrowedQuantity.toString(),
-                      Icons.book_outlined,
-                      Colors.green,
+                    SizedBox(
+                      width: itemWidth,
+                      child: _buildStatItem(
+                        '当前在借',
+                        _currentBorrowedQuantity.toString(),
+                        Icons.book_outlined,
+                        Colors.green,
+                      ),
                     ),
-                    _buildStatItem(
-                      '即将到期',
-                      _dueSoonBooks.toString(),
-                      Icons.event_available,
-                      Colors.amber,
+                    SizedBox(
+                      width: itemWidth,
+                      child: _buildStatItem(
+                        '即将到期',
+                        _dueSoonBooks.toString(),
+                        Icons.event_available,
+                        Colors.amber,
+                      ),
                     ),
-                    _buildStatItem(
-                      '逾期图书',
-                      _overdueBooks.toString(),
-                      Icons.warning,
-                      Colors.red,
+                    SizedBox(
+                      width: itemWidth,
+                      child: _buildStatItem(
+                        '逾期图书',
+                        _overdueBooks.toString(),
+                        Icons.warning,
+                        Colors.red,
+                      ),
                     ),
                   ],
                 );
@@ -412,27 +648,39 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
     IconData icon,
     Color color,
   ) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withAlpha(26),
-            borderRadius: BorderRadius.circular(12),
+    return SizedBox(
+      height: 112,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withAlpha(26),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 22),
           ),
-          child: Icon(icon, color: color, size: 24),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey[800],
+          const SizedBox(height: 6),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[800],
+            ),
           ),
-        ),
-        Text(title, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-      ],
+          const SizedBox(height: 2),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          ),
+        ],
+      ),
     );
   }
 
@@ -635,4 +883,63 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
       });
     return sorted.first.key;
   }
+
+  List<_StudentMetricItem> _metricItems(Iterable<String> values) {
+    final counts = <String, int>{};
+    for (final rawValue in values) {
+      final value = rawValue.trim();
+      if (value.isEmpty) continue;
+      counts[value] = (counts[value] ?? 0) + 1;
+    }
+    final sorted = counts.entries.toList()
+      ..sort((a, b) {
+        final countCompare = b.value.compareTo(a.value);
+        return countCompare != 0 ? countCompare : a.key.compareTo(b.key);
+      });
+    return sorted
+        .take(5)
+        .map((entry) => _StudentMetricItem(entry.key, entry.value))
+        .toList();
+  }
+
+  List<_StudentMonthlyTrend> _buildMonthlyTrend(List<BorrowRecord> records) {
+    final now = DateTime.now();
+    final months = List.generate(
+      6,
+      (index) => DateTime(now.year, now.month - (5 - index), 1),
+    );
+    final counts = {
+      for (final month in months) _monthKey(month): 0,
+    };
+    for (final record in records) {
+      final key = _monthKey(record.borrowDate);
+      if (counts.containsKey(key)) counts[key] = counts[key]! + 1;
+    }
+    return months
+        .map(
+          (month) => _StudentMonthlyTrend(
+            '${month.month}月',
+            counts[_monthKey(month)] ?? 0,
+          ),
+        )
+        .toList();
+  }
+
+  String _monthKey(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}';
+  }
+}
+
+class _StudentMetricItem {
+  const _StudentMetricItem(this.label, this.count);
+
+  final String label;
+  final int count;
+}
+
+class _StudentMonthlyTrend {
+  const _StudentMonthlyTrend(this.monthLabel, this.count);
+
+  final String monthLabel;
+  final int count;
 }

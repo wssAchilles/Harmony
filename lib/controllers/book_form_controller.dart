@@ -2,6 +2,24 @@ import 'package:flutter/material.dart';
 
 import '../models/book.dart';
 import '../models/category.dart';
+import '../utils/isbn_validator.dart';
+
+const defaultBookTagSuggestions = [
+  '绘本',
+  '睡前故事',
+  '亲子阅读',
+  '动物',
+  '自然',
+  '科普',
+  '计算机',
+  '软件工程',
+  '编译原理',
+  '工程经济',
+  '思政',
+  '公考',
+  '教材',
+  '练习资料',
+];
 
 class BookFormController {
   BookFormController({this.initialBook}) {
@@ -46,7 +64,7 @@ class BookFormController {
       title: titleController.text.trim(),
       author: authorController.text.trim(),
       publisher: _optionalText(publisherController.text),
-      isbn: _optionalText(isbnController.text),
+      isbn: _optionalText(IsbnValidator.normalize(isbnController.text)),
       location: locationController.text.trim(),
       coverImageUrl: coverImageUrl,
       categoryId: selectedCategory?.id,
@@ -76,6 +94,10 @@ class BookFormController {
     if (rating == null) return '请输入0到5之间的评分';
     if (rating < 0 || rating > 5) return '评分必须在0到5之间';
     return null;
+  }
+
+  String? validateIsbn(String? value) {
+    return IsbnValidator.validate(value);
   }
 
   String? validateAddQuantity(String? value) {
@@ -138,6 +160,43 @@ class BookFormController {
     quantityController.dispose();
     totalQuantityController.dispose();
     availableQuantityController.dispose();
+  }
+
+  double get ratingValue {
+    final rating = double.tryParse(ratingController.text.trim());
+    if (rating == null) return 0;
+    return rating.clamp(0, 5).toDouble();
+  }
+
+  void increaseRating() {
+    setRating(ratingValue + 0.5);
+  }
+
+  void decreaseRating() {
+    setRating(ratingValue - 0.5);
+  }
+
+  void setRating(double value) {
+    final normalized = value.clamp(0, 5).toDouble();
+    ratingController.text =
+        normalized == 0 ? '' : normalized.toStringAsFixed(1);
+  }
+
+  void applyTagSuggestion(String suggestion) {
+    final existingTags = _parseTags(tagsController.text);
+    if (existingTags.contains(suggestion)) return;
+    existingTags.add(suggestion);
+    tagsController.text = existingTags.join('，');
+  }
+
+  List<String> tagSuggestions({List<String> extraTags = const []}) {
+    final existing = _parseTags(tagsController.text).toSet();
+    return [...defaultBookTagSuggestions, ...extraTags]
+        .map((tag) => tag.trim())
+        .where((tag) => tag.isNotEmpty && !existing.contains(tag))
+        .toSet()
+        .take(8)
+        .toList();
   }
 
   String? _optionalText(String value) {

@@ -32,6 +32,7 @@ class BorrowService {
     required Student student,
     int quantity = 1,
     int borrowDays = 14,
+    int? reminderDaysBefore,
   }) async {
     if (student.id == null) {
       throw const InvalidRequestException('学生ID不能为空');
@@ -40,6 +41,7 @@ class BorrowService {
       book: book,
       quantity: quantity,
       borrowDays: borrowDays,
+      reminderDaysBefore: reminderDaysBefore,
       studentId: student.id,
     );
   }
@@ -48,11 +50,13 @@ class BorrowService {
     required Book book,
     int quantity = 1,
     int borrowDays = 30,
+    int? reminderDaysBefore,
   }) async {
     await _borrowBook(
       book: book,
       quantity: quantity,
       borrowDays: borrowDays,
+      reminderDaysBefore: reminderDaysBefore,
       profileId: _currentUserIdProvider(),
     );
   }
@@ -61,6 +65,7 @@ class BorrowService {
     required Book book,
     required int quantity,
     required int borrowDays,
+    int? reminderDaysBefore,
     int? studentId,
     String? profileId,
   }) async {
@@ -112,6 +117,7 @@ class BorrowService {
           ),
           'borrowed_by_user_id': currentUserId,
           'quantity': quantity,
+          'reminder_days_before': reminderDaysBefore,
         },
       );
     } catch (e) {
@@ -248,7 +254,9 @@ class BorrowService {
   Future<List<BorrowRecord>> getDueSoonRecords({int withinDays = 3}) async {
     try {
       final now = DateTime.now();
-      final dueLimit = now.add(Duration(days: withinDays + 1));
+      final dueLimit = now.add(
+        Duration(days: withinDays < 30 ? 31 : withinDays + 1),
+      );
       final records = await _loadBorrowRecords(
         filter:
             'return_date = null && due_date >= "${now.toUtc().toIso8601String()}" && due_date < "${dueLimit.toUtc().toIso8601String()}"',
@@ -372,6 +380,7 @@ class BorrowService {
       final student = await _findStudent(studentId);
       if (student != null) {
         data['student_name'] = student.fullName;
+        data['student_class_name'] = student.className;
       }
     }
 

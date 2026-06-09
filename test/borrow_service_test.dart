@@ -22,6 +22,7 @@ void main() {
       student: Student(id: 2, fullName: '小明', className: '大班A'),
       quantity: 2,
       borrowDays: 7,
+      reminderDaysBefore: 2,
     );
 
     final book = backend.record('books', 1);
@@ -34,6 +35,7 @@ void main() {
     expect(record.get<int>('student_id'), 2);
     expect(record.get<String>('borrowed_by_user_id'), 'teacher-1');
     expect(record.get<int>('quantity'), 2);
+    expect(record.get<int>('reminder_days_before'), 2);
     expect(record.get<String>('due_date'), isNotEmpty);
   });
 
@@ -201,7 +203,8 @@ class _FakeBackendGateway implements BackendGateway {
   }
 
   @override
-  Future<RecordModel> create(String collection, Map<String, dynamic> body) async {
+  Future<RecordModel> create(
+      String collection, Map<String, dynamic> body) async {
     final record = RecordModel(Map<String, dynamic>.from(body));
     putRecord(collection, record);
     return record;
@@ -224,10 +227,11 @@ class _FakeBackendGateway implements BackendGateway {
       return _matchesFilter(record, filter);
     }).toList();
     if (sort == 'due_date') {
-      result.sort((a, b) => _date(a, 'due_date').compareTo(_date(b, 'due_date')));
-    } else if (sort == '-borrow_date') {
       result
-          .sort((a, b) => _date(b, 'borrow_date').compareTo(_date(a, 'borrow_date')));
+          .sort((a, b) => _date(a, 'due_date').compareTo(_date(b, 'due_date')));
+    } else if (sort == '-borrow_date') {
+      result.sort(
+          (a, b) => _date(b, 'borrow_date').compareTo(_date(a, 'borrow_date')));
     }
     return result;
   }

@@ -45,6 +45,7 @@ Future<void> _resetCollections(PocketBase pb) async {
     'record_id_probe',
     'id_field_probe',
     'book_cover_files',
+    'app_settings',
     'borrow_records',
     'books',
     'students',
@@ -136,6 +137,7 @@ Future<void> _createCollections(PocketBase pb) async {
       _date('return_date'),
       _text('borrowed_by_user_id', required: true),
       _number('quantity', required: true, onlyInt: true, min: 1),
+      _number('reminder_days_before', onlyInt: true, min: 1, max: 30),
     ],
     indexes: [
       'CREATE INDEX `idx_borrow_records_book_id` ON `borrow_records` (`book_id`)',
@@ -143,6 +145,26 @@ Future<void> _createCollections(PocketBase pb) async {
       'CREATE INDEX `idx_borrow_records_profile_id` ON `borrow_records` (`profile_id`)',
       'CREATE INDEX `idx_borrow_records_return_date` ON `borrow_records` (`return_date`)',
     ],
+  );
+
+  await pb.collections.create(
+    body: {
+      'name': 'app_settings',
+      'type': 'base',
+      'listRule': '@request.auth.id != ""',
+      'viewRule': '@request.auth.id != ""',
+      'createRule': '@request.auth.role = "admin"',
+      'updateRule': '@request.auth.role = "admin"',
+      'deleteRule': '@request.auth.role = "admin"',
+      'fields': [
+        _text('key', required: true),
+        _json('value'),
+        _date('updated_at'),
+      ],
+      'indexes': [
+        'CREATE UNIQUE INDEX `idx_app_settings_key` ON `app_settings` (`key`)',
+      ],
+    },
   );
 }
 
@@ -250,6 +272,18 @@ Future<void> _importData(PocketBase pb, Map<String, CopyTable> tables) async {
       },
     );
   }
+
+  await pb.collection('app_settings').create(
+    body: {
+      'key': 'borrow_reminder_settings',
+      'value': {
+        'due_soon_days': 3,
+        'student_reminder_days': 3,
+        'teacher_reminder_days': 5,
+      },
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    },
+  );
 }
 
 CopyTable _readCopyTable(String dump, String tableName) {

@@ -12,6 +12,7 @@ import '../ui/motion/motion.dart';
 import '../ui/widgets/empty_state_view.dart';
 import '../ui/widgets/error_state_view.dart';
 import '../ui/widgets/status_chip.dart';
+import '../utils/search_matcher.dart';
 
 /// 主页界面 - 图书列表页面
 class HomeScreen extends StatefulWidget {
@@ -23,13 +24,78 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _categoryScrollController = ScrollController();
 
   HomeController get _controller => context.read<HomeController>();
 
   @override
   void dispose() {
     _searchController.dispose();
+    _categoryScrollController.dispose();
     super.dispose();
+  }
+
+  Widget _buildHorizontalScrollIndicator({
+    required ScrollController controller,
+    required Color color,
+  }) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        if (!controller.hasClients) {
+          return const SizedBox(height: 6);
+        }
+
+        final position = controller.position;
+        if (!position.hasContentDimensions || position.maxScrollExtent <= 0) {
+          return const SizedBox(height: 6);
+        }
+
+        final viewportWidth = position.viewportDimension;
+        final contentWidth = viewportWidth + position.maxScrollExtent;
+        final thumbFraction = (viewportWidth / contentWidth).clamp(0.12, 1.0);
+        final scrollFraction =
+            (position.pixels / position.maxScrollExtent).clamp(0.0, 1.0);
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final trackWidth = constraints.maxWidth;
+            var thumbWidth = trackWidth * thumbFraction;
+            if (thumbWidth < 32) thumbWidth = 32;
+            if (thumbWidth > trackWidth) thumbWidth = trackWidth;
+            final left = (trackWidth - thumbWidth) * scrollFraction;
+
+            return SizedBox(
+              height: 6,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: color.withAlpha(32),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: left,
+                    top: 0,
+                    bottom: 0,
+                    width: thumbWidth,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: color.withAlpha(180),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   /// 处理登出逻辑
@@ -132,6 +198,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// 构建图书网格项
   Widget _buildBookGridItem(Book book) {
+    final query = context.read<HomeController>().searchQuery;
+    final titleMatch = SearchMatcher.matchText(book.title, query);
+    final assistedMatchLabel = _assistedMatchLabel(book, query);
+
     return _PressableBookCard(
       onTap: () => _navigateToBookDetail(book),
       child: Card(
@@ -201,11 +271,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // 书名
-                    Text(
+                    _buildHighlightedText(
                       book.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      query,
+                      titleMatch,
+                      baseStyle: const TextStyle(
                         fontSize: 14,
                         height: 1.1,
                         fontWeight: FontWeight.bold,
@@ -214,22 +284,22 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 3),
                     // 作者
                     if (book.author != null)
-                      Text(
+                      _buildHighlightedText(
                         book.author!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
+                        query,
+                        SearchMatcher.matchText(book.author, query),
+                        baseStyle: TextStyle(
                           fontSize: 12,
                           height: 1.1,
                           color: Colors.grey[600],
                         ),
                       ),
                     if (book.publisher != null)
-                      Text(
+                      _buildHighlightedText(
                         book.publisher!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
+                        query,
+                        SearchMatcher.matchText(book.publisher, query),
+                        baseStyle: TextStyle(
                           fontSize: 11,
                           height: 1.1,
                           color: Colors.grey[600],
@@ -246,6 +316,20 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: Colors.amber[800],
                         ),
                       ),
+                    if (assistedMatchLabel.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        assistedMatchLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10,
+                          height: 1.0,
+                          color: Colors.blue[700],
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                     const Spacer(),
                     // 库存信息和状态
                     Row(
@@ -288,6 +372,64 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildHighlightedText(
+    String text,
+    String query,
+    SearchMatch match, {
+    required TextStyle baseStyle,
+  }) {
+    if (!match.hasRange || query.trim().isEmpty) {
+      return Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: baseStyle,
+      );
+    }
+
+    final before = text.substring(0, match.start);
+    final highlighted = text.substring(match.start, match.end);
+    final after = text.substring(match.end);
+    return Text.rich(
+      TextSpan(
+        style: baseStyle,
+        children: [
+          TextSpan(text: before),
+          TextSpan(
+            text: highlighted,
+            style: baseStyle.copyWith(
+              color: Colors.orange[900],
+              backgroundColor: Colors.amber[100],
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          TextSpan(text: after),
+        ],
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+
+  String _assistedMatchLabel(Book book, String query) {
+    if (query.trim().isEmpty) return '';
+    for (final field in [
+      book.title,
+      book.author,
+      book.publisher,
+      book.isbn,
+      book.location,
+      book.categoryName,
+      ...book.tags,
+    ]) {
+      final label = SearchMatcher.searchAssistLabel(
+        SearchMatcher.matchText(field, query).kind,
+      );
+      if (label.isNotEmpty) return label;
+    }
+    return '';
   }
 
   @override
@@ -380,40 +522,61 @@ class _HomeScreenState extends State<HomeScreen> {
               if (!_controller.categoriesLoading &&
                   _controller.categories.isNotEmpty)
                 Container(
-                  height: 60,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
+                  height: 74,
+                  color: Colors.grey[100],
+                  child: Column(
                     children: [
-                      // "全部"筛选芯片
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: FilterChip(
-                          label: const Text('全部'),
-                          selected: _controller.selectedCategoryId == null,
-                          onSelected: (_) {
-                            _controller.selectCategory(null);
-                          },
-                          backgroundColor: Colors.grey[200],
-                          selectedColor: Colors.blue[100],
-                          checkmarkColor: Colors.blue[700],
+                      SizedBox(
+                        height: 54,
+                        child: ListView(
+                          controller: _categoryScrollController,
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                          children: [
+                            // "全部"筛选芯片
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: FilterChip(
+                                label: const Text('全部'),
+                                selected:
+                                    _controller.selectedCategoryId == null,
+                                onSelected: (_) {
+                                  _controller.selectCategory(null);
+                                },
+                                backgroundColor: Colors.grey[200],
+                                selectedColor: Colors.blue[100],
+                                checkmarkColor: Colors.blue[700],
+                              ),
+                            ),
+                            // 分类筛选芯片
+                            ..._controller.categories.map(
+                              (category) => Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: FilterChip(
+                                  label: Text(
+                                    category.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.visible,
+                                  ),
+                                  selected: _controller.selectedCategoryId ==
+                                      category.id,
+                                  onSelected: (_) {
+                                    _controller.selectCategory(category.id);
+                                  },
+                                  backgroundColor: Colors.grey[200],
+                                  selectedColor: Colors.blue[100],
+                                  checkmarkColor: Colors.blue[700],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      // 分类筛选芯片
-                      ..._controller.categories.map(
-                        (category) => Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: FilterChip(
-                            label: Text(category.name),
-                            selected:
-                                _controller.selectedCategoryId == category.id,
-                            onSelected: (_) {
-                              _controller.selectCategory(category.id);
-                            },
-                            backgroundColor: Colors.grey[200],
-                            selectedColor: Colors.blue[100],
-                            checkmarkColor: Colors.blue[700],
-                          ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: _buildHorizontalScrollIndicator(
+                          controller: _categoryScrollController,
+                          color: Colors.blue,
                         ),
                       ),
                     ],

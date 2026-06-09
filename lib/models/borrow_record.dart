@@ -10,10 +10,12 @@ class BorrowRecord {
   final String borrowedByUserId; // 经办老师ID
   final DateTime? createdAt;
   final int quantity; // 本次借阅的数量
+  final int? reminderDaysBefore; // 本次借阅提前提醒天数
 
   // 便利字段 - 用于UI显示
   final String? bookTitle;
   final String? studentName;
+  final String? studentClassName;
   final String? teacherName; // 老师姓名（如果是老师借阅）
   final String? bookAuthor;
   final String? bookCategoryName;
@@ -33,8 +35,10 @@ class BorrowRecord {
     required this.borrowedByUserId,
     this.createdAt,
     this.quantity = 1, // 默认数量为1
+    this.reminderDaysBefore,
     this.bookTitle,
     this.studentName,
+    this.studentClassName,
     this.teacherName,
     this.bookAuthor,
     this.bookCategoryName,
@@ -79,7 +83,8 @@ class BorrowRecord {
 
   bool isDueSoonAt(DateTime now, {int withinDays = 3}) {
     if (isReturned || dueDate == null || isOverdueAt(now)) return false;
-    return !dueDate!.isAfter(now.add(Duration(days: withinDays)));
+    final effectiveDays = reminderDaysBefore ?? withinDays;
+    return !dueDate!.isAfter(now.add(Duration(days: effectiveDays)));
   }
 
   /// 从JSON创建对象
@@ -107,9 +112,12 @@ class BorrowRecord {
       borrowedByUserId: json['borrowed_by_user_id'] as String? ?? '',
       createdAt: _asDateTime(json['created_at'] ?? json['created']),
       quantity: _asInt(json['quantity']) ?? 1,
+      reminderDaysBefore: _asReminderDays(json['reminder_days_before']),
       bookTitle:
           json['book_title'] as String? ?? json['books']?['title'] as String?,
       studentName: studentName,
+      studentClassName: json['student_class_name'] as String? ??
+          json['students']?['class_name'] as String?,
       teacherName: teacherName,
       bookAuthor:
           json['book_author'] as String? ?? json['books']?['author'] as String?,
@@ -139,6 +147,9 @@ class BorrowRecord {
     if (dueDate != null) data['due_date'] = dueDate!.toIso8601String();
     if (returnDate != null) data['return_date'] = returnDate!.toIso8601String();
     if (createdAt != null) data['created_at'] = createdAt!.toIso8601String();
+    if (reminderDaysBefore != null) {
+      data['reminder_days_before'] = reminderDaysBefore;
+    }
 
     return data;
   }
@@ -155,8 +166,10 @@ class BorrowRecord {
     String? borrowedByUserId,
     DateTime? createdAt,
     int? quantity,
+    int? reminderDaysBefore,
     String? bookTitle,
     String? studentName,
+    String? studentClassName,
     String? teacherName,
     String? bookAuthor,
     String? bookCategoryName,
@@ -176,8 +189,10 @@ class BorrowRecord {
       borrowedByUserId: borrowedByUserId ?? this.borrowedByUserId,
       createdAt: createdAt ?? this.createdAt,
       quantity: quantity ?? this.quantity,
+      reminderDaysBefore: reminderDaysBefore ?? this.reminderDaysBefore,
       bookTitle: bookTitle ?? this.bookTitle,
       studentName: studentName ?? this.studentName,
+      studentClassName: studentClassName ?? this.studentClassName,
       teacherName: teacherName ?? this.teacherName,
       bookAuthor: bookAuthor ?? this.bookAuthor,
       bookCategoryName: bookCategoryName ?? this.bookCategoryName,
@@ -195,6 +210,12 @@ int? _asInt(dynamic value) {
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value);
   return null;
+}
+
+int? _asReminderDays(dynamic value) {
+  final days = _asInt(value);
+  if (days == null || days <= 0) return null;
+  return days;
 }
 
 DateTime? _asDateTime(dynamic value) {

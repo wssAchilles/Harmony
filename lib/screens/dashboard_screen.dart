@@ -1,5 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/dashboard_data.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/dashboard_controller.dart';
 import '../screens/overdue_records_screen.dart';
@@ -24,6 +27,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   DashboardController? _controller;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  final ScrollController _monthlyTrendScrollController = ScrollController();
 
   @override
   void initState() {
@@ -52,6 +56,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   void dispose() {
     _controller?.removeListener(_handleDashboardState);
+    _monthlyTrendScrollController.dispose();
     _animationController.dispose();
     super.dispose();
   }
@@ -259,6 +264,60 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   subtitleFor: (student) =>
                                       student.className ?? '未分配班级',
                                   countFor: (student) => student.count,
+                                ),
+                              ),
+                            ),
+                          ),
+                          SliverPadding(
+                            padding: const EdgeInsets.all(16),
+                            sliver: SliverToBoxAdapter(
+                              child: _buildStaggered(
+                                index: 8,
+                                child: _buildInsightBars(
+                                  title: '分类借阅分布',
+                                  items: controller.insights.categoryItems,
+                                  icon: Icons.category_outlined,
+                                  color: Colors.indigo,
+                                ),
+                              ),
+                            ),
+                          ),
+                          SliverPadding(
+                            padding: const EdgeInsets.all(16),
+                            sliver: SliverToBoxAdapter(
+                              child: _buildStaggered(
+                                index: 9,
+                                child: _buildInsightBars(
+                                  title: '标注兴趣方向',
+                                  items: controller.insights.tagItems,
+                                  icon: Icons.sell_outlined,
+                                  color: Colors.teal,
+                                ),
+                              ),
+                            ),
+                          ),
+                          SliverPadding(
+                            padding: const EdgeInsets.all(16),
+                            sliver: SliverToBoxAdapter(
+                              child: _buildStaggered(
+                                index: 10,
+                                child: _buildMonthlyTrendCard(
+                                  controller.insights.monthlyTrend,
+                                ),
+                              ),
+                            ),
+                          ),
+                          SliverPadding(
+                            padding: const EdgeInsets.all(16),
+                            sliver: SliverToBoxAdapter(
+                              child: _buildStaggered(
+                                index: 11,
+                                child: _buildRankingCard(
+                                  title: '班级阅读排行榜',
+                                  items: controller.insights.classRankings,
+                                  titleFor: (item) => item.label,
+                                  subtitleFor: (_) => '班级阅读量',
+                                  countFor: (item) => item.count,
                                 ),
                               ),
                             ),
@@ -498,6 +557,191 @@ class _DashboardScreenState extends State<DashboardScreen>
               );
             }),
           const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInsightBars({
+    required String title,
+    required List<BorrowMetricItem> items,
+    required IconData icon,
+    required Color color,
+  }) {
+    final maxCount = items.fold<int>(
+      1,
+      (max, item) => item.count > max ? item.count : max,
+    );
+    return SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (items.isEmpty)
+            Text(
+              '暂无数据',
+              style: TextStyle(color: Colors.grey[500], fontSize: 14),
+            )
+          else
+            ...items.map((item) {
+              final value = item.count / maxCount;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${item.count}次',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    LinearProgressIndicator(
+                      value: value,
+                      minHeight: 8,
+                      borderRadius: BorderRadius.circular(4),
+                      color: color,
+                      backgroundColor: color.withAlpha(28),
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMonthlyTrendCard(List<MonthlyBorrowTrend> trends) {
+    const chartHeight = 156.0;
+    const barSlotWidth = 72.0;
+    final maxCount = trends.fold<int>(
+      1,
+      (max, item) => item.count > max ? item.count : max,
+    );
+    return SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.insights, color: Colors.blue.shade700, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                '月度借阅趋势',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 176,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final contentWidth = math.max(
+                  constraints.maxWidth,
+                  trends.length * barSlotWidth,
+                );
+                final hasHorizontalOverflow =
+                    trends.length * barSlotWidth > constraints.maxWidth;
+
+                return Scrollbar(
+                  controller: _monthlyTrendScrollController,
+                  thumbVisibility: hasHorizontalOverflow,
+                  trackVisibility: hasHorizontalOverflow,
+                  scrollbarOrientation: ScrollbarOrientation.bottom,
+                  child: SingleChildScrollView(
+                    controller: _monthlyTrendScrollController,
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: SizedBox(
+                      width: contentWidth,
+                      height: chartHeight,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: trends.map((trend) {
+                          final barHeight = 24 + (trend.count / maxCount) * 78;
+                          return SizedBox(
+                            width: barSlotWidth,
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 6),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '${trend.count}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[700],
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    width: double.infinity,
+                                    height: barHeight,
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.shade600,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    height: 18,
+                                    child: Text(
+                                      trend.monthLabel,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );

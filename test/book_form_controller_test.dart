@@ -28,7 +28,7 @@ void main() {
     controller.titleController.text = '小熊绘本';
     controller.authorController.text = '张老师';
     controller.publisherController.text = '童心出版社';
-    controller.isbnController.text = '9787111111111';
+    controller.isbnController.text = '978-0-306-40615-7';
     controller.locationController.text = 'A架1层';
     controller.tagsController.text = '绘本，动物 睡前';
     controller.ratingController.text = '4.5';
@@ -42,7 +42,7 @@ void main() {
     expect(book.title, '小熊绘本');
     expect(book.author, '张老师');
     expect(book.publisher, '童心出版社');
-    expect(book.isbn, '9787111111111');
+    expect(book.isbn, '9780306406157');
     expect(book.location, 'A架1层');
     expect(book.tags, ['绘本', '动物', '睡前']);
     expect(book.rating, 4.5);
@@ -76,5 +76,43 @@ void main() {
     expect(controller.validateRating('5'), isNull);
     expect(controller.validateRating('6'), '评分必须在0到5之间');
     expect(controller.validateRating('abc'), '请输入0到5之间的评分');
+  });
+
+  test('validates and normalizes ISBN values', () {
+    final controller = BookFormController();
+    addTearDown(controller.dispose);
+
+    expect(controller.validateIsbn('978-0-306-40615-7'), isNull);
+    expect(controller.validateIsbn('0-306-40615-2'), isNull);
+    expect(
+        controller.validateIsbn('9780306406158'), '请输入有效的 ISBN-10 或 ISBN-13');
+  });
+
+  test('rating stepper clamps to half-star range', () {
+    final controller = BookFormController();
+    addTearDown(controller.dispose);
+
+    controller.increaseRating();
+    controller.increaseRating();
+    expect(controller.ratingController.text, '1.0');
+
+    controller.setRating(6);
+    expect(controller.ratingController.text, '5.0');
+
+    controller.setRating(0);
+    expect(controller.ratingController.text, isEmpty);
+  });
+
+  test('tag suggestions apply without duplicates', () {
+    final controller = BookFormController();
+    addTearDown(controller.dispose);
+
+    controller.tagsController.text = '绘本';
+    controller.applyTagSuggestion('动物');
+    controller.applyTagSuggestion('动物');
+
+    expect(controller.tagsController.text, '绘本，动物');
+    expect(controller.tagSuggestions(), isNot(contains('绘本')));
+    expect(controller.tagSuggestions(), isNot(contains('动物')));
   });
 }

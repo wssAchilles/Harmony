@@ -143,6 +143,7 @@ void main() {
     expect(controller.summary.dueSoonCount, 2);
     expect(controller.topBooks.single.title, '小熊绘本');
     expect(controller.topStudents.single.fullName, '小明');
+    expect(controller.insights.categoryItems.single.label, '绘本');
     expect(loadingStates, [true, false]);
   });
 
@@ -241,5 +242,16 @@ class _FakeDashboardDataSource implements DashboardDataSource {
     return const [
       TopActiveStudent(studentId: 1, count: 2, fullName: '小明'),
     ];
+  }
+
+  @override
+  Future<BorrowInsights> getBorrowInsights() async {
+    _maybeThrow();
+    return const BorrowInsights(
+      categoryItems: [BorrowMetricItem(label: '绘本', count: 3)],
+      tagItems: [BorrowMetricItem(label: '睡前故事', count: 2)],
+      monthlyTrend: [MonthlyBorrowTrend(monthLabel: '6月', count: 2)],
+      classRankings: [BorrowMetricItem(label: '大班A', count: 2)],
+    );
   }
 }

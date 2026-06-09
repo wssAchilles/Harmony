@@ -361,7 +361,9 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
                   hintText: '请输入ISBN编号',
                   prefixIcon: Icon(Icons.qr_code_2),
                   border: OutlineInputBorder(),
+                  helperText: '支持 ISBN-10 / ISBN-13，保存时会自动去除空格和连字符',
                 ),
+                validator: _form.validateIsbn,
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 16),
@@ -390,25 +392,13 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
                   border: OutlineInputBorder(),
                   helperText: '多个标注可用逗号或空格分隔',
                 ),
+                onChanged: (_) => setState(() {}),
                 textInputAction: TextInputAction.next,
               ),
+              _buildTagSuggestions(),
               const SizedBox(height: 16),
 
-              // 评分输入框
-              TextFormField(
-                controller: _form.ratingController,
-                decoration: const InputDecoration(
-                  labelText: '评分',
-                  hintText: '0-5，可留空',
-                  prefixIcon: Icon(Icons.star),
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                validator: _form.validateRating,
-                textInputAction: TextInputAction.next,
-              ),
+              _buildRatingStepper(),
               const SizedBox(height: 16),
 
               // 数量输入框（仅在添加模式显示）
@@ -659,6 +649,90 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTagSuggestions() {
+    final suggestions = _form.tagSuggestions(
+      extraTags: [
+        if (_selectedCategory?.name.trim().isNotEmpty == true)
+          _selectedCategory!.name,
+      ],
+    );
+    if (suggestions.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: suggestions
+            .map(
+              (tag) => ActionChip(
+                avatar: const Icon(Icons.add, size: 16),
+                label: Text(tag),
+                onPressed: () {
+                  setState(() => _form.applyTagSuggestion(tag));
+                },
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+
+  Widget _buildRatingStepper() {
+    final rating = _form.ratingValue;
+    return InputDecorator(
+      decoration: const InputDecoration(
+        labelText: '评分',
+        prefixIcon: Icon(Icons.star),
+        border: OutlineInputBorder(),
+        helperText: '可按半星调整，0 表示暂不评分',
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                onPressed:
+                    rating <= 0 ? null : () => setState(_form.decreaseRating),
+                icon: const Icon(Icons.remove_circle_outline),
+                tooltip: '降低评分',
+              ),
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    final threshold = index + 1;
+                    final icon = rating >= threshold
+                        ? Icons.star
+                        : rating >= threshold - 0.5
+                            ? Icons.star_half
+                            : Icons.star_border;
+                    return Icon(icon, color: Colors.amber[700], size: 24);
+                  }),
+                ),
+              ),
+              IconButton(
+                onPressed:
+                    rating >= 5 ? null : () => setState(_form.increaseRating),
+                icon: const Icon(Icons.add_circle_outline),
+                tooltip: '提高评分',
+              ),
+              SizedBox(
+                width: 48,
+                child: Text(
+                  rating <= 0 ? '未评' : rating.toStringAsFixed(1),
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
