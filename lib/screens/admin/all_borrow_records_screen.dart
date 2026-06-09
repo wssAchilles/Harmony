@@ -18,7 +18,7 @@ class _AllBorrowRecordsScreenState extends State<AllBorrowRecordsScreen> {
   List<Map<String, dynamic>> _filteredRecords = [];
   bool _isLoading = true;
   String _searchQuery = '';
-  String _selectedFilter = '全部'; // 全部、已归还、未归还、逾期
+  String _selectedFilter = '全部'; // 全部、已归还、未归还、即将到期、逾期
 
   final TextEditingController _searchController = TextEditingController();
 
@@ -71,6 +71,7 @@ class _AllBorrowRecordsScreenState extends State<AllBorrowRecordsScreen> {
           ? null
           : {'full_name': record.borrowerTeacherName ?? record.teacherName},
       'handler_profile': {'full_name': record.handlerTeacherName},
+      'borrower_type': record.borrowerType,
     };
   }
 
@@ -88,6 +89,8 @@ class _AllBorrowRecordsScreenState extends State<AllBorrowRecordsScreen> {
             return record['return_date'] == null &&
                 (record['due_date'] == null ||
                     DateTime.parse(record['due_date']).isAfter(DateTime.now()));
+          case '即将到期':
+            return _isDueSoon(record);
           case '逾期':
             return record['return_date'] == null &&
                 record['due_date'] != null &&
@@ -103,22 +106,27 @@ class _AllBorrowRecordsScreenState extends State<AllBorrowRecordsScreen> {
       filtered = filtered.where((record) {
         final bookTitle =
             record['books']['title']?.toString().toLowerCase() ?? '';
+        final bookAuthor =
+            record['books']['author']?.toString().toLowerCase() ?? '';
         final studentName =
             record['students']?['full_name']?.toString().toLowerCase() ?? '';
-        final borrowerTeacher =
-            record['borrower_profile']?['full_name']
+        final borrowerTeacher = record['borrower_profile']?['full_name']
                 ?.toString()
                 .toLowerCase() ??
             '';
         final handlerTeacher =
             record['handler_profile']?['full_name']?.toString().toLowerCase() ??
-            '';
+                '';
+        final borrowerType =
+            record['borrower_type']?.toString().toLowerCase() ?? '';
         final query = _searchQuery.toLowerCase();
 
         return bookTitle.contains(query) ||
+            bookAuthor.contains(query) ||
             studentName.contains(query) ||
             borrowerTeacher.contains(query) ||
-            handlerTeacher.contains(query);
+            handlerTeacher.contains(query) ||
+            borrowerType.contains(query);
       }).toList();
     }
 
@@ -152,6 +160,14 @@ class _AllBorrowRecordsScreenState extends State<AllBorrowRecordsScreen> {
         label: const Text('逾期'),
         backgroundColor: Colors.red.shade100,
         labelStyle: TextStyle(color: Colors.red.shade800),
+      );
+    } else if (_isDueSoon(record)) {
+      final dueDate = DateTime.parse(record['due_date']);
+      final daysLeft = dueDate.difference(DateTime.now()).inDays;
+      return Chip(
+        label: Text(daysLeft <= 0 ? '今日到期' : '即将到期'),
+        backgroundColor: Colors.amber.shade100,
+        labelStyle: TextStyle(color: Colors.amber.shade900),
       );
     } else {
       return Chip(
@@ -233,7 +249,7 @@ class _AllBorrowRecordsScreenState extends State<AllBorrowRecordsScreen> {
           TextField(
             controller: _searchController,
             decoration: InputDecoration(
-              hintText: '搜索图书名称、学生姓名或借阅老师',
+              hintText: '搜索图书名称、学生/老师姓名或类型',
               prefixIcon: const Icon(Icons.search),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
@@ -258,7 +274,7 @@ class _AllBorrowRecordsScreenState extends State<AllBorrowRecordsScreen> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: ['全部', '已归还', '未归还', '逾期'].map((filter) {
+              children: ['全部', '已归还', '未归还', '即将到期', '逾期'].map((filter) {
                 final isSelected = _selectedFilter == filter;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
@@ -365,5 +381,15 @@ class _AllBorrowRecordsScreenState extends State<AllBorrowRecordsScreen> {
         ],
       ),
     );
+  }
+
+  bool _isDueSoon(Map<String, dynamic> record) {
+    if (record['return_date'] != null || record['due_date'] == null) {
+      return false;
+    }
+    final dueDate = DateTime.parse(record['due_date']);
+    final now = DateTime.now();
+    if (dueDate.isBefore(now)) return false;
+    return !dueDate.isAfter(now.add(const Duration(days: 3)));
   }
 }

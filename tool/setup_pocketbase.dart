@@ -105,6 +105,8 @@ Future<void> _createCollections(PocketBase pb) async {
       _date('created_at', required: true),
       _text('title', required: true),
       _text('author'),
+      _text('publisher'),
+      _text('isbn'),
       _text('location'),
       _text('cover_image_url'),
       _text('status', required: true),
@@ -112,9 +114,12 @@ Future<void> _createCollections(PocketBase pb) async {
       _number('total_quantity', required: true, onlyInt: true, min: 0),
       _number('available_quantity', required: true, onlyInt: true, min: 0),
       _json('category_id'),
+      _json('tags'),
+      _number('rating', min: 0, max: 5),
     ],
     indexes: [
       'CREATE INDEX `idx_books_category_id` ON `books` (`category_id`)',
+      'CREATE INDEX `idx_books_isbn` ON `books` (`isbn`)',
     ],
   );
 
@@ -170,86 +175,80 @@ Future<void> _importData(PocketBase pb, Map<String, CopyTable> tables) async {
   for (final row in tables['public.profiles']!.rows) {
     final sourceId = row['id']!;
     final user = authUsers[sourceId];
-    await pb
-        .collection('profiles')
-        .create(
-          body: {
-            'id': _idFromUuid(sourceId),
-            'email': user?['email'] ?? '${_idFromUuid(sourceId)}@local.invalid',
-            'password': _importPassword,
-            'passwordConfirm': _importPassword,
-            'emailVisibility': true,
-            'verified': true,
-            'source_id': sourceId,
-            'full_name': row['full_name'],
-            'updated_at': _dateValue(row['updated_at']),
-            'role': row['role'] ?? 'teacher',
-          },
-        );
+    await pb.collection('profiles').create(
+      body: {
+        'id': _idFromUuid(sourceId),
+        'email': user?['email'] ?? '${_idFromUuid(sourceId)}@local.invalid',
+        'password': _importPassword,
+        'passwordConfirm': _importPassword,
+        'emailVisibility': true,
+        'verified': true,
+        'source_id': sourceId,
+        'full_name': row['full_name'],
+        'updated_at': _dateValue(row['updated_at']),
+        'role': row['role'] ?? 'teacher',
+      },
+    );
   }
 
   for (final row in tables['public.categories']!.rows) {
-    await pb
-        .collection('categories')
-        .create(
-          body: {
-            'id': _numericRecordId(row['id']!),
-            'name': row['name'],
-            'created_at': _dateValue(row['created_at']),
-          },
-        );
+    await pb.collection('categories').create(
+      body: {
+        'id': _numericRecordId(row['id']!),
+        'name': row['name'],
+        'created_at': _dateValue(row['created_at']),
+      },
+    );
   }
 
   for (final row in tables['public.students']!.rows) {
-    await pb
-        .collection('students')
-        .create(
-          body: {
-            'id': _numericRecordId(row['id']!),
-            'created_at': _dateValue(row['created_at']),
-            'full_name': row['full_name'],
-            'class_name': row['class_name'],
-          },
-        );
+    await pb.collection('students').create(
+      body: {
+        'id': _numericRecordId(row['id']!),
+        'created_at': _dateValue(row['created_at']),
+        'full_name': row['full_name'],
+        'class_name': row['class_name'],
+      },
+    );
   }
 
   for (final row in tables['public.books']!.rows) {
-    await pb
-        .collection('books')
-        .create(
-          body: {
-            'id': _numericRecordId(row['id']!),
-            'created_at': _dateValue(row['created_at']),
-            'title': row['title'],
-            'author': row['author'],
-            'location': row['location'],
-            'cover_image_url': row['cover_image_url'],
-            'status': row['status'],
-            'last_updated_by': row['last_updated_by'],
-            'total_quantity': _intValue(row['total_quantity']),
-            'available_quantity': _intValue(row['available_quantity']),
-            'category_id': _intValue(row['category_id']),
-          },
-        );
+    await pb.collection('books').create(
+      body: {
+        'id': _numericRecordId(row['id']!),
+        'created_at': _dateValue(row['created_at']),
+        'title': row['title'],
+        'author': row['author'],
+        'publisher': null,
+        'isbn': null,
+        'location': row['location'],
+        'cover_image_url': row['cover_image_url'],
+        'status': row['status'],
+        'last_updated_by': row['last_updated_by'],
+        'total_quantity': _intValue(row['total_quantity']),
+        'available_quantity': _intValue(row['available_quantity']),
+        'category_id': _intValue(row['category_id']),
+        'tags': <String>[],
+        'rating': null,
+      },
+    );
   }
 
   for (final row in tables['public.borrow_records']!.rows) {
-    await pb
-        .collection('borrow_records')
-        .create(
-          body: {
-            'id': _numericRecordId(row['id']!),
-            'created_at': _dateValue(row['created_at']),
-            'book_id': _intValue(row['book_id']),
-            'student_id': _intValue(row['student_id']),
-            'profile_id': row['profile_id'],
-            'borrow_date': _dateValue(row['borrow_date']),
-            'due_date': _dateValue(row['due_date']),
-            'return_date': _dateValue(row['return_date']),
-            'borrowed_by_user_id': row['borrowed_by_user_id'],
-            'quantity': _intValue(row['quantity']) ?? 1,
-          },
-        );
+    await pb.collection('borrow_records').create(
+      body: {
+        'id': _numericRecordId(row['id']!),
+        'created_at': _dateValue(row['created_at']),
+        'book_id': _intValue(row['book_id']),
+        'student_id': _intValue(row['student_id']),
+        'profile_id': row['profile_id'],
+        'borrow_date': _dateValue(row['borrow_date']),
+        'due_date': _dateValue(row['due_date']),
+        'return_date': _dateValue(row['return_date']),
+        'borrowed_by_user_id': row['borrowed_by_user_id'],
+        'quantity': _intValue(row['quantity']) ?? 1,
+      },
+    );
   }
 }
 
@@ -265,11 +264,8 @@ CopyTable _readCopyTable(String dump, String tableName) {
     throw StateError('COPY block not found: $tableName');
   }
 
-  final columns = match
-      .group(1)!
-      .split(',')
-      .map((column) => column.trim())
-      .toList();
+  final columns =
+      match.group(1)!.split(',').map((column) => column.trim()).toList();
   final rows = <Map<String, String?>>[];
   final body = match.group(2)!;
   for (final line in body.split('\n')) {
@@ -310,6 +306,7 @@ Map<String, Object?> _number(
   bool required = false,
   bool onlyInt = false,
   num? min,
+  num? max,
 }) {
   return {
     'name': name,
@@ -317,6 +314,7 @@ Map<String, Object?> _number(
     'required': required,
     'onlyInt': onlyInt,
     if (min != null) 'min': min,
+    if (max != null) 'max': max,
   };
 }
 

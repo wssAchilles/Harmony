@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/dashboard_controller.dart';
 import '../screens/overdue_records_screen.dart';
+import '../screens/due_soon_records_screen.dart';
 import '../screens/admin/all_borrow_records_screen.dart';
 import 'package:intl/intl.dart';
 import '../utils/page_transitions.dart';
@@ -198,6 +199,23 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     },
                                   ),
                                 ),
+                                _buildStaggered(
+                                  index: 4,
+                                  child: _buildStatCard(
+                                    title: '即将到期',
+                                    value: '${controller.summary.dueSoonCount}',
+                                    icon: Icons.event_available,
+                                    color: Colors.amber,
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        SlidePageRoute(
+                                          page: const DueSoonRecordsScreen(),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
                               ]),
                             ),
                           ),
@@ -205,7 +223,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             sliver: SliverToBoxAdapter(
                               child: _buildStaggered(
-                                index: 4,
+                                index: 5,
                                 child: _buildMonthlyStatCard(
                                   hasAdminAccess: hasAdminAccess,
                                   monthlyBorrows:
@@ -218,7 +236,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                             padding: const EdgeInsets.all(16),
                             sliver: SliverToBoxAdapter(
                               child: _buildStaggered(
-                                index: 5,
+                                index: 6,
                                 child: _buildRankingCard(
                                   title: '🔥 本月热门图书',
                                   items: controller.topBooks,
@@ -233,7 +251,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                             padding: const EdgeInsets.all(16),
                             sliver: SliverToBoxAdapter(
                               child: _buildStaggered(
-                                index: 6,
+                                index: 7,
                                 child: _buildRankingCard(
                                   title: '⭐ 本月借阅之星',
                                   items: controller.topStudents,

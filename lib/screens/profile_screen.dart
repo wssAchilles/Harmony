@@ -434,6 +434,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   Widget _buildBorrowItem(BorrowRecord record) {
     // 使用模型中的业务逻辑，避免空指针异常
     final isOverdue = record.isOverdue;
+    final isDueSoon = record.isDueSoonAt(DateTime.now());
     final daysLeft = record.daysRemaining;
 
     return Container(
@@ -443,7 +444,11 @@ class _ProfileScreenState extends State<ProfileScreen>
         color: Colors.grey[50],
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isOverdue ? Colors.red.shade200 : Colors.grey.shade200,
+          color: isOverdue
+              ? Colors.red.shade200
+              : isDueSoon
+                  ? Colors.amber.shade300
+                  : Colors.grey.shade200,
         ),
       ),
       child: Row(
@@ -505,18 +510,30 @@ class _ProfileScreenState extends State<ProfileScreen>
                     Icon(
                       isOverdue ? Icons.warning : Icons.schedule,
                       size: 14,
-                      color: isOverdue ? Colors.red : Colors.orange,
+                      color: isOverdue
+                          ? Colors.red
+                          : isDueSoon
+                              ? Colors.amber[800]
+                              : Colors.orange,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       isOverdue
                           ? '已逾期 ${-daysLeft} 天'
-                          : daysLeft > 0
-                              ? '剩余 $daysLeft 天'
-                              : '今日到期',
+                          : isDueSoon
+                              ? daysLeft > 0
+                                  ? '即将到期，剩余 $daysLeft 天'
+                                  : '今日到期'
+                              : daysLeft > 0
+                                  ? '剩余 $daysLeft 天'
+                                  : '今日到期',
                       style: TextStyle(
                         fontSize: 12,
-                        color: isOverdue ? Colors.red : Colors.orange,
+                        color: isOverdue
+                            ? Colors.red
+                            : isDueSoon
+                                ? Colors.amber[900]
+                                : Colors.orange,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

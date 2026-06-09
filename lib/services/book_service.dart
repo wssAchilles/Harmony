@@ -113,14 +113,18 @@ class BookService {
 
   Future<List<Book>> searchBooks(String query) async {
     try {
-      final keyword = escapeFilterValue(query);
-      final records = await _backend.getFullList(
-        'books',
-        filter:
-            'title ~ "$keyword" || author ~ "$keyword" || location ~ "$keyword"',
-        sort: '-created_at',
-      );
-      return _booksFromRecords(records);
+      final keyword = query.trim().toLowerCase();
+      final books = await getBooksWithCategories();
+      if (keyword.isEmpty) return books;
+      return books.where((book) {
+        return book.title.toLowerCase().contains(keyword) ||
+            (book.author?.toLowerCase() ?? '').contains(keyword) ||
+            (book.publisher?.toLowerCase() ?? '').contains(keyword) ||
+            (book.isbn?.toLowerCase() ?? '').contains(keyword) ||
+            (book.location?.toLowerCase() ?? '').contains(keyword) ||
+            (book.categoryName?.toLowerCase() ?? '').contains(keyword) ||
+            book.tags.any((tag) => tag.toLowerCase().contains(keyword));
+      }).toList();
     } catch (e) {
       throwServiceException('搜索图书失败', e);
     }
@@ -176,12 +180,16 @@ class BookService {
     return {
       'title': book.title,
       'author': book.author,
+      'publisher': book.publisher,
+      'isbn': book.isbn,
       'location': book.location,
       'cover_image_url': book.coverImageUrl,
       'status': book.status,
       'total_quantity': book.totalQuantity,
       'available_quantity': book.availableQuantity,
       'category_id': book.categoryId,
+      'tags': book.tags,
+      'rating': book.rating,
     };
   }
 }

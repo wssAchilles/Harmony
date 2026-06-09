@@ -5,6 +5,8 @@ class Book {
   final int? id;
   final String title;
   final String? author;
+  final String? publisher;
+  final String? isbn;
   final String? location;
   final String? coverImageUrl;
   final String status;
@@ -12,6 +14,8 @@ class Book {
   final int availableQuantity; // 可借数量
   final int? categoryId; // 分类ID
   final String? categoryName; // 分类名称（用于UI显示）
+  final List<String> tags;
+  final double? rating;
   final String? lastUpdatedBy;
   final DateTime? createdAt;
 
@@ -19,6 +23,8 @@ class Book {
     this.id,
     required this.title,
     this.author,
+    this.publisher,
+    this.isbn,
     this.location,
     this.coverImageUrl,
     this.status = 'available',
@@ -26,6 +32,8 @@ class Book {
     this.availableQuantity = 1,
     this.categoryId,
     this.categoryName,
+    this.tags = const [],
+    this.rating,
     this.lastUpdatedBy,
     this.createdAt,
   });
@@ -43,6 +51,8 @@ class Book {
       id: _asInt(json['id']),
       title: json['title'] as String,
       author: json['author'] as String?,
+      publisher: _asNullableString(json['publisher']),
+      isbn: _asNullableString(json['isbn']),
       location: json['location'] as String?,
       coverImageUrl: json['cover_image_url'] as String?,
       status: json['status'] as String? ?? 'available',
@@ -50,6 +60,8 @@ class Book {
       availableQuantity: _asInt(json['available_quantity']) ?? 1,
       categoryId: _asInt(json['category_id']),
       categoryName: categoryName,
+      tags: _asStringList(json['tags']),
+      rating: _asDouble(json['rating']),
       lastUpdatedBy: json['last_updated_by'] as String?,
       createdAt: (json['created_at'] ?? json['created']) != null
           ? DateTime.parse((json['created_at'] ?? json['created']) as String)
@@ -62,11 +74,15 @@ class Book {
     final Map<String, dynamic> data = {
       'title': title,
       'author': author,
+      'publisher': publisher,
+      'isbn': isbn,
       'location': location,
       'status': status,
       'total_quantity': totalQuantity,
       'available_quantity': availableQuantity,
       'category_id': categoryId,
+      'tags': tags,
+      'rating': rating,
     };
 
     // 只在更新时包含id
@@ -90,6 +106,8 @@ class Book {
     int? id,
     String? title,
     String? author,
+    String? publisher,
+    String? isbn,
     String? location,
     String? coverImageUrl,
     String? status,
@@ -97,6 +115,8 @@ class Book {
     int? availableQuantity,
     int? categoryId,
     String? categoryName,
+    List<String>? tags,
+    double? rating,
     String? lastUpdatedBy,
     DateTime? createdAt,
   }) {
@@ -104,6 +124,8 @@ class Book {
       id: id ?? this.id,
       title: title ?? this.title,
       author: author ?? this.author,
+      publisher: publisher ?? this.publisher,
+      isbn: isbn ?? this.isbn,
       location: location ?? this.location,
       coverImageUrl: coverImageUrl ?? this.coverImageUrl,
       status: status ?? this.status,
@@ -111,6 +133,8 @@ class Book {
       availableQuantity: availableQuantity ?? this.availableQuantity,
       categoryId: categoryId ?? this.categoryId,
       categoryName: categoryName ?? this.categoryName,
+      tags: tags ?? this.tags,
+      rating: rating ?? this.rating,
       lastUpdatedBy: lastUpdatedBy ?? this.lastUpdatedBy,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -144,4 +168,36 @@ int? _asInt(dynamic value) {
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value);
   return null;
+}
+
+double? _asDouble(dynamic value) {
+  if (value == null) return null;
+  if (value is double) return value;
+  if (value is num) return value.toDouble();
+  if (value is String && value.isNotEmpty) return double.tryParse(value);
+  return null;
+}
+
+String? _asNullableString(dynamic value) {
+  if (value == null) return null;
+  final text = value.toString().trim();
+  return text.isEmpty ? null : text;
+}
+
+List<String> _asStringList(dynamic value) {
+  if (value == null) return const [];
+  if (value is List) {
+    return value
+        .map((item) => item.toString().trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+  }
+  if (value is String) {
+    return value
+        .split(RegExp(r'[,，\s]+'))
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+  }
+  return const [];
 }

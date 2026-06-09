@@ -36,6 +36,18 @@ class DashboardService {
     }
   }
 
+  Future<int> getDueSoonCount({int withinDays = 3}) async {
+    try {
+      final records = await _borrowService.getDueSoonRecords(
+        withinDays: withinDays,
+      );
+      return records.length;
+    } catch (e) {
+      AppLogger.warning('获取即将到期图书数量失败: $e');
+      return 0;
+    }
+  }
+
   Future<List<TopBorrowedBook>> getTopBorrowedBooks() async {
     try {
       final firstDayOfMonth = DateTime(
@@ -148,6 +160,20 @@ class DashboardService {
     }
   }
 
+  Future<List<OverdueBorrowRecordView>> getDueSoonRecords({
+    int withinDays = 3,
+  }) async {
+    try {
+      final records = await _borrowService.getDueSoonRecords(
+        withinDays: withinDays,
+      );
+      return records.map(OverdueBorrowRecordView.fromBorrowRecord).toList();
+    } catch (e) {
+      AppLogger.warning('获取即将到期记录失败: $e');
+      return [];
+    }
+  }
+
   Future<DashboardSummary> getDashboardSummary() async {
     try {
       final books = await _bookService.getBooksWithCategories();
@@ -183,6 +209,11 @@ class DashboardService {
             .where(
               (BorrowRecord record) =>
                   record.dueDate != null && record.dueDate!.isBefore(now),
+            )
+            .length,
+        dueSoonCount: activeRecords
+            .where(
+              (BorrowRecord record) => record.isDueSoonAt(now, withinDays: 3),
             )
             .length,
       );

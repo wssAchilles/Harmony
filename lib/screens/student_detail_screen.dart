@@ -27,7 +27,11 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
   List<BorrowRecord> _currentBorrows = [];
   bool _isLoading = true;
   int _totalBorrows = 0;
+  int _currentBorrowedQuantity = 0;
+  int _dueSoonBooks = 0;
   int _overdueBooks = 0;
+  String? _favoriteCategory;
+  String? _favoriteTag;
 
   @override
   void initState() {
@@ -57,16 +61,31 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
         widget.student.id!,
       );
       if (!mounted) return;
+      final currentBorrows =
+          records.where((r) => r.returnDate == null).toList();
+      final now = DateTime.now();
 
       setState(() {
         _borrowHistory = records;
-        _currentBorrows = records.where((r) => r.returnDate == null).toList();
+        _currentBorrows = currentBorrows;
         _totalBorrows = records.length;
-        _overdueBooks = _currentBorrows
-            .where(
-              (r) => r.dueDate != null && r.dueDate!.isBefore(DateTime.now()),
-            )
-            .length;
+        _currentBorrowedQuantity = currentBorrows.fold<int>(
+          0,
+          (sum, record) => sum + record.quantity,
+        );
+        _dueSoonBooks =
+            currentBorrows.where((record) => record.isDueSoonAt(now)).length;
+        _overdueBooks =
+            currentBorrows.where((record) => record.isOverdueAt(now)).length;
+        _favoriteCategory = _mostCommon(
+          records
+              .map((record) => record.bookCategoryName)
+              .whereType<String>()
+              .where((category) => category.trim().isNotEmpty),
+        );
+        _favoriteTag = _mostCommon(
+          records.expand((record) => record.bookTags),
+        );
         _isLoading = false;
       });
 
@@ -317,34 +336,70 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
+        child: Column(
           children: [
-            Expanded(
-              child: _buildStatItem(
-                '总借阅',
-                _totalBorrows.toString(),
-                Icons.book,
-                Colors.blue,
-              ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = constraints.maxWidth >= 520 ? 4 : 2;
+                return GridView.count(
+                  crossAxisCount: columns,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: columns == 4 ? 1.15 : 1.9,
+                  children: [
+                    _buildStatItem(
+                      '总借阅',
+                      _totalBorrows.toString(),
+                      Icons.book,
+                      Colors.blue,
+                    ),
+                    _buildStatItem(
+                      '当前在借',
+                      _currentBorrowedQuantity.toString(),
+                      Icons.book_outlined,
+                      Colors.green,
+                    ),
+                    _buildStatItem(
+                      '即将到期',
+                      _dueSoonBooks.toString(),
+                      Icons.event_available,
+                      Colors.amber,
+                    ),
+                    _buildStatItem(
+                      '逾期图书',
+                      _overdueBooks.toString(),
+                      Icons.warning,
+                      Colors.red,
+                    ),
+                  ],
+                );
+              },
             ),
-            const VerticalDivider(),
-            Expanded(
-              child: _buildStatItem(
-                '当前在借',
-                _currentBorrows.length.toString(),
-                Icons.book_outlined,
-                Colors.green,
+            if (_favoriteCategory != null || _favoriteTag != null) ...[
+              const Divider(height: 24),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (_favoriteCategory != null)
+                    _buildPreferenceChip(
+                      '常借分类',
+                      _favoriteCategory!,
+                      Icons.category,
+                      Colors.indigo,
+                    ),
+                  if (_favoriteTag != null)
+                    _buildPreferenceChip(
+                      '常借标注',
+                      _favoriteTag!,
+                      Icons.local_offer,
+                      Colors.teal,
+                    ),
+                ],
               ),
-            ),
-            const VerticalDivider(),
-            Expanded(
-              child: _buildStatItem(
-                '逾期图书',
-                _overdueBooks.toString(),
-                Icons.warning,
-                Colors.red,
-              ),
-            ),
+            ],
           ],
         ),
       ),
@@ -381,10 +436,41 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
     );
   }
 
+  Widget _buildPreferenceChip(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withAlpha(24),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withAlpha(70)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Text(
+            '$label：$value',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey[800],
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBorrowRecordCard(BorrowRecord record, bool isCurrent) {
-    final isOverdue = isCurrent &&
-        record.dueDate != null &&
-        record.dueDate!.isBefore(DateTime.now());
+    final now = DateTime.now();
+    final isOverdue = isCurrent && record.isOverdueAt(now);
+    final isDueSoon = isCurrent && record.isDueSoonAt(now);
 
     return Card(
       child: Padding(
@@ -395,7 +481,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
             CircleAvatar(
               backgroundColor: isOverdue
                   ? Colors.red
-                  : (isCurrent ? Colors.orange : Colors.green),
+                  : isDueSoon
+                      ? Colors.amber[700]
+                      : (isCurrent ? Colors.orange : Colors.green),
               child: Icon(
                 isCurrent ? Icons.book_outlined : Icons.check,
                 color: Colors.white,
@@ -430,9 +518,9 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
   }
 
   Widget _buildBorrowRecordContent(BorrowRecord record, bool isCurrent) {
-    final isOverdue = isCurrent &&
-        record.dueDate != null &&
-        record.dueDate!.isBefore(DateTime.now());
+    final now = DateTime.now();
+    final isOverdue = isCurrent && record.isOverdueAt(now);
+    final isDueSoon = isCurrent && record.isDueSoonAt(now);
     final detailStyle = TextStyle(fontSize: 14, color: Colors.grey[600]);
 
     return Column(
@@ -487,14 +575,17 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
         if (isCurrent) ...[
           const SizedBox(height: 2),
           Text(
-            isOverdue
-                ? '已逾期 ${DateTime.now().difference(record.dueDate!).inDays} 天'
-                : '应还日期: ${DateFormat('yyyy-MM-dd').format(record.dueDate!)}',
+            _borrowStatusText(record, now),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: isOverdue ? Colors.red : Colors.grey[600],
-              fontWeight: isOverdue ? FontWeight.bold : FontWeight.normal,
+              color: isOverdue
+                  ? Colors.red
+                  : isDueSoon
+                      ? Colors.amber[900]
+                      : Colors.grey[600],
+              fontWeight:
+                  isOverdue || isDueSoon ? FontWeight.bold : FontWeight.normal,
             ),
           ),
         ] else if (record.returnDate != null) ...[
@@ -508,5 +599,40 @@ class _StudentDetailScreenState extends State<StudentDetailScreen>
         ],
       ],
     );
+  }
+
+  String _borrowStatusText(BorrowRecord record, DateTime now) {
+    final dueDate = record.dueDate;
+    if (dueDate == null) return '未设置应还日期';
+
+    if (record.isOverdueAt(now)) {
+      final overdueDays = -record.daysUntilDueAt(now);
+      return '已逾期 ${overdueDays <= 0 ? 1 : overdueDays} 天';
+    }
+
+    final dueDateText = DateFormat('yyyy-MM-dd').format(dueDate);
+    final daysLeft = record.daysUntilDueAt(now);
+    if (daysLeft <= 0) return '今日到期，应还日期: $dueDateText';
+    if (record.isDueSoonAt(now)) {
+      return '即将到期，剩余 $daysLeft 天，应还日期: $dueDateText';
+    }
+    return '应还日期: $dueDateText';
+  }
+
+  String? _mostCommon(Iterable<String> values) {
+    final counts = <String, int>{};
+    for (final rawValue in values) {
+      final value = rawValue.trim();
+      if (value.isEmpty) continue;
+      counts[value] = (counts[value] ?? 0) + 1;
+    }
+    if (counts.isEmpty) return null;
+
+    final sorted = counts.entries.toList()
+      ..sort((a, b) {
+        final countCompare = b.value.compareTo(a.value);
+        return countCompare != 0 ? countCompare : a.key.compareTo(b.key);
+      });
+    return sorted.first.key;
   }
 }

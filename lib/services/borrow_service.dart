@@ -14,11 +14,18 @@ class BorrowService {
   static final BorrowService _instance = BorrowService._internal();
   factory BorrowService() => _instance;
   BorrowService._internal({BackendGateway? backend})
-      : _backend = backend ?? backendGateway;
+      : _backend = backend ?? backendGateway,
+        _currentUserIdProvider = (() => AuthService().currentUserId);
 
-  BorrowService.withBackend(BackendGateway backend) : _backend = backend;
+  BorrowService.withBackend(
+    BackendGateway backend, {
+    String? Function()? currentUserIdProvider,
+  })  : _backend = backend,
+        _currentUserIdProvider =
+            currentUserIdProvider ?? (() => AuthService().currentUserId);
 
   final BackendGateway _backend;
+  final String? Function() _currentUserIdProvider;
 
   Future<void> borrowBookToStudent({
     required Book book,
@@ -46,7 +53,7 @@ class BorrowService {
       book: book,
       quantity: quantity,
       borrowDays: borrowDays,
-      profileId: AuthService().currentUserId,
+      profileId: _currentUserIdProvider(),
     );
   }
 
@@ -61,7 +68,7 @@ class BorrowService {
       throw const InvalidBorrowQuantityException();
     }
 
-    final currentUserId = AuthService().currentUserId;
+    final currentUserId = _currentUserIdProvider();
     if (currentUserId == null) {
       throw const UnauthenticatedException();
     }
@@ -123,7 +130,7 @@ class BorrowService {
 
   Future<void> returnBook(int recordId) async {
     try {
-      final currentUserId = AuthService().currentUserId;
+      final currentUserId = _currentUserIdProvider();
       if (currentUserId == null) {
         throw const UnauthenticatedException();
       }
@@ -238,6 +245,24 @@ class BorrowService {
     }
   }
 
+  Future<List<BorrowRecord>> getDueSoonRecords({int withinDays = 3}) async {
+    try {
+      final now = DateTime.now();
+      final dueLimit = now.add(Duration(days: withinDays + 1));
+      final records = await _loadBorrowRecords(
+        filter:
+            'return_date = null && due_date >= "${now.toUtc().toIso8601String()}" && due_date < "${dueLimit.toUtc().toIso8601String()}"',
+        sort: 'due_date',
+      );
+      return records
+          .where((record) => record.isDueSoonAt(now, withinDays: withinDays))
+          .toList();
+    } catch (e) {
+      AppLogger.warning('获取即将到期记录失败: $e');
+      return [];
+    }
+  }
+
   Future<void> renewBorrow({
     required BorrowRecord record,
     int extraDays = 7,
@@ -337,6 +362,8 @@ class BorrowService {
       if (book != null) {
         data['book_title'] = book.title;
         data['book_author'] = book.author;
+        data['book_category_name'] = book.categoryName;
+        data['book_tags'] = book.tags;
         data['book_cover_image_url'] = book.coverImageUrl;
       }
     }
@@ -362,7 +389,21 @@ class BorrowService {
 
   Future<Book?> _findBook(int id) async {
     final record = await _backend.findByNumericId('books', id);
-    return record == null ? null : Book.fromJson(recordToJson(record));
+    if (record == null) return null;
+    final book = Book.fromJson(recordToJson(record));
+    final categoryId = book.categoryId;
+    if (categoryId == null) return book;
+
+    try {
+      final category = await _backend.findByNumericId('categories', categoryId);
+      final categoryName = category?.get<String?>('name');
+      return categoryName == null
+          ? book
+          : book.copyWith(categoryName: categoryName);
+    } catch (e) {
+      AppLogger.warning('加载图书分类名称失败: $e');
+      return book;
+    }
   }
 
   Future<Student?> _findStudent(int id) async {

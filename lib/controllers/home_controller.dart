@@ -78,8 +78,11 @@ class HomeController extends ChangeNotifier {
       filtered = filtered.where((book) {
         return book.title.toLowerCase().contains(query) ||
             (book.author?.toLowerCase() ?? '').contains(query) ||
+            (book.publisher?.toLowerCase() ?? '').contains(query) ||
+            (book.isbn?.toLowerCase() ?? '').contains(query) ||
             (book.location?.toLowerCase() ?? '').contains(query) ||
-            (book.categoryName?.toLowerCase() ?? '').contains(query);
+            (book.categoryName?.toLowerCase() ?? '').contains(query) ||
+            book.tags.any((tag) => tag.toLowerCase().contains(query));
       }).toList();
     }
 

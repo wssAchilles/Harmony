@@ -16,6 +16,8 @@ class BorrowRecord {
   final String? studentName;
   final String? teacherName; // 老师姓名（如果是老师借阅）
   final String? bookAuthor;
+  final String? bookCategoryName;
+  final List<String> bookTags;
   final String? bookCoverImageUrl;
   final String? borrowerTeacherName; // 借阅老师姓名（通过profile_id关联）
   final String? handlerTeacherName; // 经办老师姓名（通过borrowed_by_user_id关联）
@@ -35,6 +37,8 @@ class BorrowRecord {
     this.studentName,
     this.teacherName,
     this.bookAuthor,
+    this.bookCategoryName,
+    this.bookTags = const [],
     this.bookCoverImageUrl,
     this.borrowerTeacherName,
     this.handlerTeacherName,
@@ -46,7 +50,12 @@ class BorrowRecord {
   /// 判断是否逾期
   bool get isOverdue {
     if (isReturned || dueDate == null) return false;
-    return DateTime.now().isAfter(dueDate!);
+    return isOverdueAt(DateTime.now());
+  }
+
+  bool isOverdueAt(DateTime now) {
+    if (isReturned || dueDate == null) return false;
+    return now.isAfter(dueDate!);
   }
 
   String get borrowerName =>
@@ -60,10 +69,17 @@ class BorrowRecord {
 
   /// 计算剩余天数或逾期天数
   int get daysRemaining {
+    return daysUntilDueAt(DateTime.now());
+  }
+
+  int daysUntilDueAt(DateTime now) {
     if (isReturned || dueDate == null) return 0;
-    final now = DateTime.now();
-    final difference = dueDate!.difference(now).inDays;
-    return difference;
+    return dueDate!.difference(now).inDays;
+  }
+
+  bool isDueSoonAt(DateTime now, {int withinDays = 3}) {
+    if (isReturned || dueDate == null || isOverdueAt(now)) return false;
+    return !dueDate!.isAfter(now.add(Duration(days: withinDays)));
   }
 
   /// 从JSON创建对象
@@ -97,6 +113,10 @@ class BorrowRecord {
       teacherName: teacherName,
       bookAuthor:
           json['book_author'] as String? ?? json['books']?['author'] as String?,
+      bookCategoryName: json['book_category_name'] as String? ??
+          json['books']?['category_name'] as String? ??
+          json['books']?['categories']?['name'] as String?,
+      bookTags: _asStringList(json['book_tags'] ?? json['books']?['tags']),
       bookCoverImageUrl: json['book_cover_image_url'] as String? ??
           json['books']?['cover_image_url'] as String?,
       borrowerTeacherName: borrowerTeacherName,
@@ -135,6 +155,15 @@ class BorrowRecord {
     String? borrowedByUserId,
     DateTime? createdAt,
     int? quantity,
+    String? bookTitle,
+    String? studentName,
+    String? teacherName,
+    String? bookAuthor,
+    String? bookCategoryName,
+    List<String>? bookTags,
+    String? bookCoverImageUrl,
+    String? borrowerTeacherName,
+    String? handlerTeacherName,
   }) {
     return BorrowRecord(
       id: id ?? this.id,
@@ -147,6 +176,15 @@ class BorrowRecord {
       borrowedByUserId: borrowedByUserId ?? this.borrowedByUserId,
       createdAt: createdAt ?? this.createdAt,
       quantity: quantity ?? this.quantity,
+      bookTitle: bookTitle ?? this.bookTitle,
+      studentName: studentName ?? this.studentName,
+      teacherName: teacherName ?? this.teacherName,
+      bookAuthor: bookAuthor ?? this.bookAuthor,
+      bookCategoryName: bookCategoryName ?? this.bookCategoryName,
+      bookTags: bookTags ?? this.bookTags,
+      bookCoverImageUrl: bookCoverImageUrl ?? this.bookCoverImageUrl,
+      borrowerTeacherName: borrowerTeacherName ?? this.borrowerTeacherName,
+      handlerTeacherName: handlerTeacherName ?? this.handlerTeacherName,
     );
   }
 }
@@ -164,4 +202,22 @@ DateTime? _asDateTime(dynamic value) {
   if (value is DateTime) return value;
   if (value is String && value.isNotEmpty) return DateTime.tryParse(value);
   return null;
+}
+
+List<String> _asStringList(dynamic value) {
+  if (value == null) return const [];
+  if (value is List) {
+    return value
+        .map((item) => item.toString().trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+  }
+  if (value is String) {
+    return value
+        .split(RegExp(r'[,，\s]+'))
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+  }
+  return const [];
 }

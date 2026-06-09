@@ -436,6 +436,46 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                         ),
                         const SizedBox(height: 4),
 
+                        if (_currentBook.publisher != null) ...[
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.business,
+                                size: 20,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  _currentBook.publisher!,
+                                  style: Theme.of(context).textTheme.bodyLarge,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                        ],
+
+                        if (_currentBook.isbn != null) ...[
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.qr_code_2,
+                                size: 20,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  'ISBN：${_currentBook.isbn}',
+                                  style: Theme.of(context).textTheme.bodyLarge,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                        ],
+
                         // 分类
                         Row(
                           children: [
@@ -470,6 +510,37 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                             ),
                           ],
                         ),
+                        if (_currentBook.rating != null) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(Icons.star,
+                                  size: 20, color: Colors.amber[700]),
+                              const SizedBox(width: 4),
+                              Text(
+                                '评分 ${_currentBook.rating!.toStringAsFixed(1)} / 5',
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (_currentBook.tags.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _currentBook.tags
+                                .map(
+                                  (tag) => StatusChip(
+                                    label: tag,
+                                    backgroundColor: Colors.blue[50]!,
+                                    foregroundColor: Colors.blue[700]!,
+                                    icon: Icons.sell_outlined,
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ],
                         const SizedBox(height: 16),
 
                         // 库存状态卡片
@@ -617,6 +688,10 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   }
 
   Widget _buildSingleBorrowInfo(BorrowRecord record) {
+    final now = DateTime.now();
+    final dueDate = record.dueDate;
+    final daysLeft = record.daysUntilDueAt(now);
+
     return Column(
       children: [
         _buildBorrowInfoRow('借阅人', record.borrowerName),
@@ -625,22 +700,24 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
         _buildBorrowInfoRow('借出日期', _formatDate(record.borrowDate)),
         _buildBorrowInfoRow(
           '应还日期',
-          record.dueDate != null ? _formatDate(record.dueDate!) : '未设置',
+          dueDate != null ? _formatDate(dueDate) : '未设置',
         ),
-        if (record.isOverdue)
+        if (dueDate == null)
+          _buildBorrowInfoRow('到期状态', '未设置应还日期')
+        else if (record.isOverdueAt(now))
           _buildBorrowInfoRow(
-            '逾期天数',
-            '${-record.daysRemaining} 天',
+            '到期状态',
+            '已逾期 ${daysLeft >= 0 ? 1 : -daysLeft} 天',
             valueColor: Colors.red,
           )
-        else if (record.daysRemaining <= 3)
+        else if (record.isDueSoonAt(now))
           _buildBorrowInfoRow(
-            '剩余天数',
-            '${record.daysRemaining} 天',
+            '到期状态',
+            daysLeft <= 0 ? '今日到期' : '即将到期，剩余 $daysLeft 天',
             valueColor: Colors.orange,
           )
         else
-          _buildBorrowInfoRow('剩余天数', '${record.daysRemaining} 天'),
+          _buildBorrowInfoRow('剩余天数', '$daysLeft 天'),
       ],
     );
   }

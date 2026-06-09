@@ -219,6 +219,21 @@ class _HomeScreenState extends State<HomeScreen> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
+                    if (book.publisher != null)
+                      Text(
+                        book.publisher!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      ),
+                    if (book.rating != null)
+                      Text(
+                        '评分 ${book.rating!.toStringAsFixed(1)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            TextStyle(fontSize: 11, color: Colors.amber[800]),
+                      ),
                     const Spacer(),
                     // 库存信息和状态
                     Row(
@@ -320,7 +335,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: '搜索书名、作者或位置...',
+                    hintText: '搜索书名、作者、ISBN或标注...',
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _controller.searchQuery.isNotEmpty
                         ? IconButton(

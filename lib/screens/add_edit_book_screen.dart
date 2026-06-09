@@ -340,6 +340,32 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
               ),
               const SizedBox(height: 16),
 
+              // 出版社输入框
+              TextFormField(
+                controller: _form.publisherController,
+                decoration: const InputDecoration(
+                  labelText: '出版社',
+                  hintText: '请输入出版社',
+                  prefixIcon: Icon(Icons.business),
+                  border: OutlineInputBorder(),
+                ),
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 16),
+
+              // ISBN输入框
+              TextFormField(
+                controller: _form.isbnController,
+                decoration: const InputDecoration(
+                  labelText: 'ISBN',
+                  hintText: '请输入ISBN编号',
+                  prefixIcon: Icon(Icons.qr_code_2),
+                  border: OutlineInputBorder(),
+                ),
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 16),
+
               // 存放位置输入框
               TextFormField(
                 controller: _form.locationController,
@@ -350,9 +376,38 @@ class _AddEditBookScreenState extends State<AddEditBookScreen> {
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) => _form.validateRequired(value, '存放位置'),
-                textInputAction:
-                    isEditMode ? TextInputAction.done : TextInputAction.next,
-                onFieldSubmitted: isEditMode ? (_) => _saveBook() : null,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 16),
+
+              // 标注输入框
+              TextFormField(
+                controller: _form.tagsController,
+                decoration: const InputDecoration(
+                  labelText: '图书标注',
+                  hintText: '例如：绘本，动物，睡前故事',
+                  prefixIcon: Icon(Icons.sell),
+                  border: OutlineInputBorder(),
+                  helperText: '多个标注可用逗号或空格分隔',
+                ),
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 16),
+
+              // 评分输入框
+              TextFormField(
+                controller: _form.ratingController,
+                decoration: const InputDecoration(
+                  labelText: '评分',
+                  hintText: '0-5，可留空',
+                  prefixIcon: Icon(Icons.star),
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                validator: _form.validateRating,
+                textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 16),
 

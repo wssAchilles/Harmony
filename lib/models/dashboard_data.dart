@@ -7,6 +7,7 @@ class DashboardSummary {
     required this.monthlyBorrows,
     required this.currentBorrowed,
     required this.overdueCount,
+    required this.dueSoonCount,
   });
 
   const DashboardSummary.empty()
@@ -14,13 +15,15 @@ class DashboardSummary {
         totalStudents = 0,
         monthlyBorrows = 0,
         currentBorrowed = 0,
-        overdueCount = 0;
+        overdueCount = 0,
+        dueSoonCount = 0;
 
   final int totalBooks;
   final int totalStudents;
   final int monthlyBorrows;
   final int currentBorrowed;
   final int overdueCount;
+  final int dueSoonCount;
 }
 
 class TopBorrowedBook {

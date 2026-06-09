@@ -1,6 +1,6 @@
 # 幼儿园图书馆管理系统
 
-Flutter 前端 + PocketBase 本地后端的幼儿园图书管理应用，支持图书、分类、学生、借阅记录、教师账号和仪表盘统计。
+Flutter 前端 + PocketBase 本地后端的幼儿园图书管理应用，支持图书、分类、学生、借阅记录、教师账号、应用内到期提醒和仪表盘统计。
 
 当前后端已从 Supabase 迁移到 PocketBase，并通过 Docker Compose 本地运行。Flutter 前端尽量保留原有界面和业务流程，数据访问层已切换到 `pocketbase` SDK。
 
@@ -70,6 +70,17 @@ admin@example.com / admin123456
 flutter pub get
 dart run tool/setup_pocketbase.dart
 ```
+
+`tool/setup_pocketbase.dart` 会删除并重建相关 collection，只适合新环境初始化或明确要从备份重建数据。
+
+已有 PocketBase 数据库只补图书字段时不要重跑 setup，请使用增量 patch：
+
+```bash
+dart run tool/patch_pocketbase_schema.dart --dry-run
+dart run tool/patch_pocketbase_schema.dart
+```
+
+增量 patch 只会给 `books` 追加缺失的 `publisher`、`isbn`、`tags`、`rating` 字段和 ISBN 索引，不会删除 collection、字段或已有记录。
 
 导入后的原 Supabase 用户登录密码统一为：
 
@@ -166,6 +177,8 @@ id system text
 created_at date
 title text
 author text
+publisher text
+isbn text
 location text
 cover_image_url text
 status text
@@ -173,6 +186,8 @@ last_updated_by text
 total_quantity number
 available_quantity number
 category_id json
+tags json
+rating number
 ```
 
 ### `borrow_records`
@@ -196,10 +211,20 @@ quantity number
 - `borrowed_by_user_id` 表示经办老师。
 - 当前迁移备份里的 8 条 `borrow_records` 都是 `profile_id` 老师/管理员借阅，`student_id` 均为空；因此学生详情页没有历史借阅记录是源数据事实，不是学生关系丢失。
 
+## PDF 借阅管理功能补强
+
+- 幼儿园业务模型保持为老师代学生借阅：老师在图书详情中选择学生并办理借阅，记录同时保存 `student_id` 和 `borrowed_by_user_id`。
+- 图书信息补充出版社、ISBN、标注和 0-5 评分；图书新增/编辑、卡片、详情和搜索均支持这些字段。
+- 搜索覆盖书名、作者、出版社、ISBN、位置、分类和标注，仍使用应用内 contains 模糊匹配。
+- 应用内提醒统计 3 天内到期记录；仪表盘、即将到期列表、学生详情、个人中心和图书详情会显示即将到期、今日到期或已逾期状态。
+- 学生详情保留当前借阅和借阅历史，并展示总借阅次数、当前在借数量、即将到期数、逾期数、常借分类和常借标注。
+- 暂不接入系统通知、铃声、震动或扫码自动获取图书信息；ISBN 字段和 ISBN 搜索已作为后续扫码录入的基础。
+
 ## 验证命令
 
 ```bash
 dart analyze tool/setup_pocketbase.dart
+dart analyze tool/patch_pocketbase_schema.dart
 flutter analyze --no-fatal-infos
 flutter test
 flutter build web --no-tree-shake-icons

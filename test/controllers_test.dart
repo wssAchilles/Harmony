@@ -14,7 +14,15 @@ void main() {
     final controller = HomeController();
     final books = [
       Book(id: 1, title: '小熊绘本', author: '张老师', categoryId: 1),
-      Book(id: 2, title: '月亮故事', author: '李老师', categoryId: 2),
+      Book(
+        id: 2,
+        title: '月亮故事',
+        author: '李老师',
+        publisher: '童心出版社',
+        isbn: '9787111111111',
+        categoryId: 2,
+        tags: const ['睡前故事'],
+      ),
     ];
 
     controller.selectCategory(1);
@@ -22,6 +30,15 @@ void main() {
 
     controller.selectCategory(null);
     controller.setSearchQuery('月亮');
+    expect(controller.filterBooks(books).map((book) => book.id), [2]);
+
+    controller.setSearchQuery('9787111111111');
+    expect(controller.filterBooks(books).map((book) => book.id), [2]);
+
+    controller.setSearchQuery('童心出版社');
+    expect(controller.filterBooks(books).map((book) => book.id), [2]);
+
+    controller.setSearchQuery('睡前');
     expect(controller.filterBooks(books).map((book) => book.id), [2]);
   });
 
@@ -123,6 +140,7 @@ void main() {
     expect(controller.isLoading, isFalse);
     expect(controller.errorMessage, isNull);
     expect(controller.summary.totalBooks, 12);
+    expect(controller.summary.dueSoonCount, 2);
     expect(controller.topBooks.single.title, '小熊绘本');
     expect(controller.topStudents.single.fullName, '小明');
     expect(loadingStates, [true, false]);
@@ -205,6 +223,7 @@ class _FakeDashboardDataSource implements DashboardDataSource {
       monthlyBorrows: 8,
       currentBorrowed: 3,
       overdueCount: 1,
+      dueSoonCount: 2,
     );
   }
 

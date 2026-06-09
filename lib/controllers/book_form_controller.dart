@@ -9,7 +9,11 @@ class BookFormController {
     if (book != null) {
       titleController.text = book.title;
       authorController.text = book.author ?? '';
+      publisherController.text = book.publisher ?? '';
+      isbnController.text = book.isbn ?? '';
       locationController.text = book.location ?? '';
+      tagsController.text = book.tags.join('，');
+      ratingController.text = book.rating?.toString() ?? '';
       totalQuantityController.text = book.totalQuantity.toString();
       availableQuantityController.text = book.availableQuantity.toString();
     }
@@ -18,7 +22,11 @@ class BookFormController {
   final Book? initialBook;
   final titleController = TextEditingController();
   final authorController = TextEditingController();
+  final publisherController = TextEditingController();
+  final isbnController = TextEditingController();
   final locationController = TextEditingController();
+  final tagsController = TextEditingController();
+  final ratingController = TextEditingController();
   final quantityController = TextEditingController(text: '1');
   final totalQuantityController = TextEditingController();
   final availableQuantityController = TextEditingController();
@@ -37,10 +45,14 @@ class BookFormController {
       id: book?.id,
       title: titleController.text.trim(),
       author: authorController.text.trim(),
+      publisher: _optionalText(publisherController.text),
+      isbn: _optionalText(isbnController.text),
       location: locationController.text.trim(),
       coverImageUrl: coverImageUrl,
       categoryId: selectedCategory?.id,
       categoryName: selectedCategory?.name,
+      tags: _parseTags(tagsController.text),
+      rating: _parseRating(ratingController.text),
       totalQuantity: book != null
           ? int.tryParse(totalQuantityController.text) ?? book.totalQuantity
           : quantity,
@@ -55,6 +67,14 @@ class BookFormController {
     if (value == null || value.trim().isEmpty) {
       return '$label不能为空';
     }
+    return null;
+  }
+
+  String? validateRating(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    final rating = double.tryParse(value.trim());
+    if (rating == null) return '请输入0到5之间的评分';
+    if (rating < 0 || rating > 5) return '评分必须在0到5之间';
     return null;
   }
 
@@ -110,9 +130,32 @@ class BookFormController {
   void dispose() {
     titleController.dispose();
     authorController.dispose();
+    publisherController.dispose();
+    isbnController.dispose();
     locationController.dispose();
+    tagsController.dispose();
+    ratingController.dispose();
     quantityController.dispose();
     totalQuantityController.dispose();
     availableQuantityController.dispose();
+  }
+
+  String? _optionalText(String value) {
+    final text = value.trim();
+    return text.isEmpty ? null : text;
+  }
+
+  List<String> _parseTags(String value) {
+    return value
+        .split(RegExp(r'[,，\s]+'))
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet()
+        .toList();
+  }
+
+  double? _parseRating(String value) {
+    if (validateRating(value) != null) return null;
+    return double.tryParse(value.trim());
   }
 }
