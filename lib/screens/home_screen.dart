@@ -196,7 +196,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(
               flex: 2,
               child: Padding(
-                padding: const EdgeInsets.all(8.0),
+                padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -207,32 +207,44 @@ class _HomeScreenState extends State<HomeScreen> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 14,
+                        height: 1.1,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
                     // 作者
                     if (book.author != null)
                       Text(
                         book.author!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.1,
+                          color: Colors.grey[600],
+                        ),
                       ),
                     if (book.publisher != null)
                       Text(
                         book.publisher!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.1,
+                          color: Colors.grey[600],
+                        ),
                       ),
                     if (book.rating != null)
                       Text(
                         '评分 ${book.rating!.toStringAsFixed(1)}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style:
-                            TextStyle(fontSize: 11, color: Colors.amber[800]),
+                        style: TextStyle(
+                          fontSize: 11,
+                          height: 1.1,
+                          color: Colors.amber[800],
+                        ),
                       ),
                     const Spacer(),
                     // 库存信息和状态
@@ -240,14 +252,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         // 库存信息
-                        Text(
-                          book.stockInfo,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[700],
-                            fontWeight: FontWeight.w500,
+                        Expanded(
+                          child: Text(
+                            book.stockInfo,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[700],
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
+                        const SizedBox(width: 4),
                         StatusChip(
                           label: book.statusText,
                           backgroundColor: book.isAvailable
@@ -448,7 +465,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
-                          childAspectRatio: 0.75,
+                          childAspectRatio: 0.64,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
                         ),
