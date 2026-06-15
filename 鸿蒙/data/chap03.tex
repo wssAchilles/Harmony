@@ -31,7 +31,7 @@
 
 移动端访问 PocketBase 必须具备网络权限。系统在 \texttt{module.json5} 中声明 \texttt{ohos.permission.INTERNET}，否则即使 PocketBase 服务正常启动，鸿蒙端也无法发起 HTTP 请求。配置文件同时声明入口 Ability、设备类型和模块信息，使应用能在手机模拟器上安装和启动。
 
-网络地址根据运行环境区分。桌面浏览器访问 PocketBase 使用 \texttt{localhost:8090}；鸿蒙模拟器中的 \texttt{127.0.0.1} 指向模拟器自身，因此必须使用 \texttt{10.0.2.2:8090} 访问 Mac 宿主机；真机验收时则需要把 Mac 和手机连接到同一局域网，再使用 Mac 的局域网 IP。该差异通过 \texttt{--dart-define} 暴露为配置项，避免在源码中反复修改地址。
+{\RaggedRight\emergencystretch=2em 网络地址根据运行环境区分。桌面浏览器访问 PocketBase\hspace{0pt} 使用 \texttt{localhost:8090}；鸿蒙模拟器中的 \texttt{127.0.0.1}\hspace{0pt} 指向模拟器自身，因此必须使用 \texttt{10.0.2.2:8090}\hspace{0pt} 访问 Mac\hspace{0pt} 宿主机；真机验收时则需要把 Mac 和手机连接到同一局域网，再使用 Mac 的局域网 IP。该差异通过 \texttt{-{}-dart-define}\hspace{0pt} 暴露为配置项，避免在源码中反复修改地址。\par}
 
 \section{后端连接与鉴权实现}
 
@@ -93,7 +93,7 @@ PocketBase 客户端初始化位于服务层的 \texttt{pocketbase\_client.dart}
 
 \section{分类管理模块}
 
-分类管理页面如图\ref{fig:category}所示，用于维护图书分类集合。分类数据来自 \texttt{categories} collection，图书表中的 \texttt{category\_id} 与分类 id 对应。页面提供分类查看、添加、编辑和删除能力，图书列表顶部的分类筛选按钮也直接来自该集合。
+{\RaggedRight\emergencystretch=2em 分类管理页面如图\ref{fig:category}所示，用于维护图书分类集合。分类数据来自 \texttt{categories}\hspace{0pt} collection，图书表中的 \texttt{category\_id} 与分类 id 对应。页面提供分类查看、添加、编辑和删除能力，图书列表顶部的分类筛选按钮也直接来自该集合。\par}
 
 \begin{figure}[!htbp]
     \centering
@@ -113,7 +113,7 @@ PocketBase 客户端初始化位于服务层的 \texttt{pocketbase\_client.dart}
     \caption{图书信息维护与分类管理页面}
 \end{figure}
 
-由于 PocketBase 的 json 字段可以保存 nullable 数字，迁移时 \texttt{books.category\_id} 使用 json 类型，避免空分类被错误转换为 \texttt{0}。Flutter 模型读取时通过统一 mapper 将 json、number 或字符串形式转换为可空整数。
+{\RaggedRight\emergencystretch=2em 由于 PocketBase\hspace{0pt} 的 json 字段可以保存 nullable 数字，迁移时 \texttt{books.category\_id}\hspace{0pt} 使用 json 类型，避免空分类被错误转换为 \texttt{0}。Flutter 模型读取时通过统一 mapper 将 json、number 或字符串形式转换为可空整数。\par}
 
 分类删除需要考虑图书引用关系。当前课程项目中分类数量较少，删除分类前主要通过界面提醒避免误操作；如果后续用于真实场景，应在服务层检查是否仍有图书引用该分类，或者把对应图书的 \texttt{category\_id} 置空。这样可以防止分类删除后图书列表出现无法解析的分类名称。
 

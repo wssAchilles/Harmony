@@ -23,7 +23,7 @@ docker compose logs -f pocketbase
 docker compose down
 \end{lstlisting}
 
-注意不要随意删除 Docker volume。系统数据库保存在 \texttt{kindergarten-pocketbase-data} 中，如果删除 volume，需要重新执行迁移脚本导入数据。
+{\RaggedRight\hbadness=10000\emergencystretch=2em 注意不要随意删除 Docker volume。系统数据库保存在\hspace{0pt} \texttt{kindergarten-pocketbase-data}\hspace{0pt} 中，如果删除 volume，需要重新执行迁移脚本导入数据。\par}
 
 \section{数据迁移}
 
@@ -42,7 +42,7 @@ dart run tool/setup_pocketbase.dart
 \centering
 \caption{后端地址配置}
 \label{tab:backend-url-config}
-\begin{tabularx}{0.95\textwidth}{lX}
+\begin{tabularx}{0.95\textwidth}{l>{\RaggedRight\arraybackslash}X}
 \toprule
 \textbf{运行环境} & \textbf{PocketBase 地址} \\
 \midrule
@@ -75,7 +75,7 @@ flutter run -d <device-id> \
 \centering
 \caption{常见问题与处理方式}
 \label{tab:faq}
-\begin{tabularx}{0.95\textwidth}{lX}
+\begin{tabularx}{0.95\textwidth}{l>{\RaggedRight\arraybackslash}X}
 \toprule
 \textbf{现象} & \textbf{处理方式} \\
 \midrule

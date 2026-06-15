@@ -15,7 +15,7 @@
     \label{fig:system-architecture}
 \end{figure}
 
-系统运行时，鸿蒙端通过 \texttt{BackendConfig} 获取 PocketBase 地址。模拟器访问宿主机 PocketBase 时使用 \texttt{http://10.0.2.2:8090}，真机验收时可通过 \texttt{--dart-define=POCKETBASE\_URL=http://Mac局域网IP:8090} 指向同一后端服务。
+{\RaggedRight\emergencystretch=2em 系统运行时，鸿蒙端通过 \texttt{BackendConfig}\hspace{0pt} 获取 PocketBase\hspace{0pt} 地址。模拟器访问宿主机 PocketBase\hspace{0pt} 时使用 \texttt{http://10.0.2.2:8090}，真机验收时可通过 \texttt{-{}-dart-define=POCKETBASE\_URL=http://Mac局域网IP:8090}\hspace{0pt} 指向同一后端服务。\par}
 
 从职责划分看，移动端并不直接操作数据库文件，而是通过 PocketBase SDK 发起 REST 请求；PocketBase 负责鉴权、数据校验和 SQLite 持久化；Docker 只负责运行环境隔离、端口映射和数据卷保存。这样的拆分使每一层都可以单独验证：前端可通过 Flutter 测试验证模型与服务逻辑，后端可通过 PocketBase 管理后台检查 collection 和记录，鸿蒙工程可通过 HAP 构建验证平台适配是否成功。
 
@@ -29,7 +29,7 @@
 \centering
 \caption{系统技术栈}
 \label{tab:tech-stack}
-\begin{tabularx}{0.95\textwidth}{lX}
+\begin{tabularx}{0.95\textwidth}{l>{\RaggedRight\arraybackslash}X}
 \toprule
 \textbf{层次} & \textbf{技术选型与作用} \\
 \midrule
@@ -65,7 +65,7 @@
 \centering
 \caption{功能模块职责划分}
 \label{tab:module-responsibility}
-\begin{tabularx}{0.95\textwidth}{l>{\raggedright\arraybackslash}p{0.24\textwidth}X}
+\begin{tabularx}{0.95\textwidth}{l>{\raggedright\arraybackslash}p{0.24\textwidth}>{\RaggedRight\arraybackslash}X}
 \toprule
 \textbf{模块} & \textbf{主要输入} & \textbf{主要输出与依赖} \\
 \midrule
@@ -87,7 +87,7 @@ PocketBase 迁移后保留原 Supabase 的主要列表及字段，核心 collect
 \centering
 \caption{PocketBase 核心 Collection 字段}
 \label{tab:data-model}
-\begin{tabularx}{0.95\textwidth}{lX}
+\begin{tabularx}{0.95\textwidth}{l>{\RaggedRight\arraybackslash}X}
 \toprule
 \textbf{Collection} & \textbf{字段说明} \\
 \midrule
@@ -150,7 +150,7 @@ available_quantity = total_quantity - sum(unreturned borrow_records.quantity)
 \centering
 \caption{主要接口调用设计}
 \label{tab:api-design}
-\begin{tabularx}{0.95\textwidth}{lXX}
+\begin{tabularx}{0.95\textwidth}{l>{\RaggedRight\arraybackslash}X>{\RaggedRight\arraybackslash}X}
 \toprule
 \textbf{服务方法} & \textbf{PocketBase 资源} & \textbf{说明} \\
 \midrule
