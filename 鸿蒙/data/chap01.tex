@@ -40,21 +40,21 @@
 表\ref{tab:business-scenario}给出了系统面向的主要业务场景。需求分析阶段将这些场景拆解为页面、服务、数据表和测试用例，后续章节中的模块设计均围绕这些场景展开。
 
 \begin{table}[htbp]
-\centering
-\caption{主要业务场景}
-\label{tab:business-scenario}
-\begin{tabularx}{0.95\textwidth}{l>{\RaggedRight\arraybackslash}X>{\RaggedRight\arraybackslash}X}
-\toprule
-\textbf{场景} & \textbf{参与角色} & \textbf{系统响应} \\
-\midrule
-图书查询 & 教师、管理员 & 按书名、作者、位置和分类检索图书，展示库存与可借状态。 \\
-图书借阅 & 教师、管理员 & 校验可借库存，创建借阅记录，扣减可借数量。 \\
-图书归还 & 教师、管理员 & 写入归还日期，恢复可借库存，刷新个人与管理员记录。 \\
-逾期核查 & 管理员 & 根据应还日期和归还状态筛选逾期未还记录。 \\
-学生维护 & 管理员 & 管理学生姓名和班级，并关联学生借阅记录。 \\
-验收部署 & 开发者、验收人员 & 启动 Docker 后端，使用鸿蒙模拟器或真机访问同一数据服务。 \\
-\bottomrule
-\end{tabularx}
+    \centering
+    \caption{主要业务场景}
+    \label{tab:business-scenario}
+    \begin{tabularx}{0.95\textwidth}{l>{\RaggedRight\arraybackslash}X>{\RaggedRight\arraybackslash}X}
+        \toprule
+        \textbf{场景} & \textbf{参与角色} & \textbf{系统响应}                    \\
+        \midrule
+        图书查询        & 教师、管理员        & 按书名、作者、位置和分类检索图书，展示库存与可借状态。      \\
+        图书借阅        & 教师、管理员        & 校验可借库存，创建借阅记录，扣减可借数量。            \\
+        图书归还        & 教师、管理员        & 写入归还日期，恢复可借库存，刷新个人与管理员记录。        \\
+        逾期核查        & 管理员           & 根据应还日期和归还状态筛选逾期未还记录。             \\
+        学生维护        & 管理员           & 管理学生姓名和班级，并关联学生借阅记录。             \\
+        验收部署        & 开发者、验收人员      & 启动 Docker 后端，使用鸿蒙模拟器或真机访问同一数据服务。 \\
+        \bottomrule
+    \end{tabularx}
 \end{table}
 
 \subsection{用户角色需求}

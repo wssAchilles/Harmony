@@ -26,22 +26,23 @@
 系统主要技术栈如表\ref{tab:tech-stack}所示。选型原则是尽量复用原 Flutter 前端，减少鸿蒙迁移时的页面重写成本，同时将高风险的云端 SDK 依赖替换为跨平台 HTTP/REST 访问方式。
 
 \begin{table}[htbp]
-\centering
-\caption{系统技术栈}
-\label{tab:tech-stack}
-\begin{tabularx}{0.95\textwidth}{l>{\RaggedRight\arraybackslash}X}
-\toprule
-\textbf{层次} & \textbf{技术选型与作用} \\
-\midrule
-移动端框架 & Flutter / Dart，保留原页面、模型和业务服务组织方式。 \\
-鸿蒙适配 & Flutter for OpenHarmony 3.22，生成 \texttt{ohos/} 工程并接入 ArkTS EntryAbility\cite{openharmony_package_structure_stage,openharmony_module_config}。 \\
-开发工具 & DevEco Studio 6.0.2、HarmonyOS SDK API 22、ohpm、hvigor\cite{openharmony_hap_package}。 \\
-后端服务 & PocketBase，提供 auth collection、base collection、REST API 和静态文件服务\cite{pocketbase_collections,pocketbase_authentication}。 \\
-部署方式 & Docker Compose，本地启动 PocketBase 并暴露 \texttt{8090} 端口\cite{docker_compose_overview}。 \\
-数据持久化 & Docker named volume \texttt{kindergarten-pocketbase-data} 保存 \texttt{/pb\_data}\cite{docker_compose_volumes}。 \\
-前端依赖 & \texttt{pocketbase}、\texttt{shared\_preferences}、\texttt{cached\_network\_image}、\texttt{intl} 等。 \\
-\bottomrule
-\end{tabularx}
+    \centering
+    \caption{系统技术栈}
+    \label{tab:tech-stack}
+    \begin{tabularx}{0.95\textwidth}{l>{\RaggedRight\arraybackslash}X}
+        \toprule
+        \textbf{层次} & \textbf{技术选型与作用}                                                                                                                             \\
+        \midrule
+        移动端框架       & Flutter / Dart，保留原页面、模型和业务服务组织方式。                                                                                                            \\
+        鸿蒙适配        & Flutter for OpenHarmony 3.22，生成 \texttt{ohos/} 工程并接入 ArkTS EntryAbility\cite{openharmony_package_structure_stage,openharmony_module_config}。 \\
+        开发工具        & DevEco Studio 6.0.2、HarmonyOS SDK API 22、ohpm、hvigor\cite{openharmony_hap_package}。                                                          \\
+        后端服务        & PocketBase，提供 auth collection、base collection、REST API 和静态文件服务\cite{pocketbase_collections,pocketbase_authentication}。                       \\
+        部署方式        & Docker Compose，本地启动 PocketBase 并暴露 \texttt{8090} 端口\cite{docker_compose_overview}。                                                           \\
+        数据持久化       & Docker named volume \texttt{kindergarten-pocketbase-data} 保存 \texttt{/pb\_data}\cite{docker_compose_volumes}。                                \\
+        前端依赖        & \texttt{pocketbase}、\texttt{shared\_preferences}、\texttt{cached\_network\_image}、\texttt{intl} 等。                                            \\
+        图表组件        & 自定义 \texttt{CustomPainter} 实现雷达图、柱状图、进度条指标和指标网格，无第三方图表库依赖，保证鸿蒙平台兼容性。                                                                         \\
+        \bottomrule
+    \end{tabularx}
 \end{table}
 
 技术选型中最关键的取舍是数据库后端。Supabase 功能完整，但课程验收时需要远程服务、项目密钥和网络连通性；PocketBase 则可以通过单个容器提供认证、表结构、数据和静态资源，启动成本更低。由于 Flutter for OpenHarmony 对部分移动端插件和原生 SDK 的支持仍需要逐项验证，本项目选择用 HTTP/REST 边界隔离平台差异，把平台相关问题控制在网络地址、权限和构建配置范围内。
@@ -61,43 +62,43 @@
 
 表\ref{tab:module-responsibility}进一步说明各模块的输入、输出和依赖关系。该表也可作为后续测试设计的依据，因为每个模块都对应一组可验证的用户行为。
 
-\begin{table}[htbp]
-\centering
-\caption{功能模块职责划分}
-\label{tab:module-responsibility}
-\begin{tabularx}{0.95\textwidth}{l>{\raggedright\arraybackslash}p{0.24\textwidth}>{\RaggedRight\arraybackslash}X}
-\toprule
-\textbf{模块} & \textbf{主要输入} & \textbf{主要输出与依赖} \\
-\midrule
-登录鉴权 & 邮箱、密码、注册资料 & 登录 token、用户角色、个人资料，依赖 \texttt{profiles}。 \\
-仪表盘 & 图书、学生、借阅记录 & 统计卡片、热门图书、本月借阅数据，依赖 \texttt{DashboardService}。 \\
-图书管理 & 搜索词、分类、图书表单 & 图书列表、详情、编辑结果，依赖 \texttt{books} 和 \texttt{categories}。 \\
-借阅归还 & 图书、借阅对象、数量、日期 & 借阅记录、库存变化、逾期状态，依赖 \texttt{BorrowService}。 \\
-学生管理 & 学生姓名、班级 & 学生列表、学生详情、个人借阅历史。 \\
-管理员查询 & 搜索词、状态筛选 & 全部借阅、未归还、逾期记录。 \\
-\bottomrule
-\end{tabularx}
+\begin{table}[H]
+    \centering
+    \caption{功能模块职责划分}
+    \label{tab:module-responsibility}
+    \begin{tabularx}{0.95\textwidth}{l>{\raggedright\arraybackslash}p{0.24\textwidth}>{\RaggedRight\arraybackslash}X}
+        \toprule
+        \textbf{模块} & \textbf{主要输入} & \textbf{主要输出与依赖}                                      \\
+        \midrule
+        登录鉴权        & 邮箱、密码、注册资料    & 登录 token、用户角色、个人资料，依赖 \texttt{profiles}。              \\
+        仪表盘         & 图书、学生、借阅记录    & 统计卡片、热门图书、本月借阅数据，依赖 \texttt{DashboardService}。        \\
+        图书管理        & 搜索词、分类、图书表单   & 图书列表、详情、编辑结果，依赖 \texttt{books} 和 \texttt{categories}。 \\
+        借阅归还        & 图书、借阅对象、数量、日期 & 借阅记录、库存变化、逾期状态，依赖 \texttt{BorrowService}。             \\
+        学生管理        & 学生姓名、班级       & 学生列表、学生详情、个人借阅历史。                                     \\
+        管理员查询       & 搜索词、状态筛选      & 全部借阅、未归还、逾期记录。                                        \\
+        \bottomrule
+    \end{tabularx}
 \end{table}
 
 \section{数据模型设计}
 
 PocketBase 迁移后保留原 Supabase 的主要列表及字段，核心 collection 如表\ref{tab:data-model}所示。PocketBase 将 collection 分为 base collection 和 auth collection，本项目正是利用 auth collection 承载用户登录资料\cite{pocketbase_collections,pocketbase_authentication}。
 
-\begin{table}[htbp]
-\centering
-\caption{PocketBase 核心 Collection 字段}
-\label{tab:data-model}
-\begin{tabularx}{0.95\textwidth}{l>{\RaggedRight\arraybackslash}X}
-\toprule
-\textbf{Collection} & \textbf{字段说明} \\
-\midrule
-\texttt{profiles} & auth collection。业务字段为 \texttt{source\_id}、\texttt{full\_name}、\texttt{updated\_at}、\texttt{role}，系统字段提供邮箱和密码认证。 \\
-\texttt{categories} & \texttt{name}、\texttt{created\_at}，用于图书分类筛选。 \\
-\texttt{students} & \texttt{created\_at}、\texttt{full\_name}、\texttt{class\_name}，用于学生借阅对象管理。 \\
-\texttt{books} & \texttt{created\_at}、\texttt{title}、\texttt{author}、\texttt{location}、\texttt{cover\_image\_url}、\texttt{status}、\texttt{last\_updated\_by}、\texttt{total\_quantity}、\texttt{available\_quantity}、\texttt{category\_id}。 \\
-\texttt{borrow\_records} & \texttt{created\_at}、\texttt{book\_id}、\texttt{student\_id}、\texttt{profile\_id}、\texttt{borrow\_date}、\texttt{due\_date}、\texttt{return\_date}、\texttt{borrowed\_by\_user\_id}、\texttt{quantity}。 \\
-\bottomrule
-\end{tabularx}
+\begin{table}[H]
+    \centering
+    \caption{PocketBase 核心 Collection 字段}
+    \label{tab:data-model}
+    \begin{tabularx}{0.95\textwidth}{l>{\RaggedRight\arraybackslash}X}
+        \toprule
+        \textbf{Collection}      & \textbf{字段说明}                                                                                                                                                                                                            \\
+        \midrule
+        \texttt{profiles}        & auth collection。业务字段为 \texttt{source\_id}、\texttt{full\_name}、\texttt{updated\_at}、\texttt{role}，系统字段提供邮箱和密码认证。                                                                                                          \\
+        \texttt{categories}      & \texttt{name}、\texttt{created\_at}，用于图书分类筛选。                                                                                                                                                                             \\
+        \texttt{students}        & \texttt{created\_at}、\texttt{full\_name}、\texttt{class\_name}，用于学生借阅对象管理。                                                                                                                                                \\
+        \texttt{books}           & \texttt{created\_at}、\texttt{title}、\texttt{author}、\texttt{location}、\texttt{cover\_image\_url}、\texttt{status}、\texttt{last\_updated\_by}、\texttt{total\_quantity}、\texttt{available\_quantity}、\texttt{category\_id}。 \\
+        \texttt{borrow\_records} & \texttt{created\_at}、\texttt{book\_id}、\texttt{student\_id}、\texttt{profile\_id}、\texttt{borrow\_date}、\texttt{due\_date}、\texttt{return\_date}、\texttt{borrowed\_by\_user\_id}、\texttt{quantity}。                       \\
+        \bottomrule
+    \end{tabularx}
 \end{table}
 
 PocketBase 的 record \texttt{id} 是系统字段，不能创建自定义数字 \texttt{id} 字段。因此迁移时将 Supabase 的数字主键保存为 15 位补零 record id，例如源库 \texttt{6} 映射为 \texttt{000000000000006}。Flutter 端通过 \texttt{pb\_mapper.dart} 将 PocketBase id 还原为业务模型中的整数 id。对于 \texttt{profiles}，完整 Supabase UUID 保存在 \texttt{source\_id}，PocketBase record id 使用 UUID 去横线后的兼容短 id。
@@ -146,22 +147,22 @@ available_quantity = total_quantity - sum(unreturned borrow_records.quantity)
 
 接口设计上，系统尽量避免在页面层拼接复杂查询。页面只表达用户意图，例如“加载图书列表”“加载某学生的借阅记录”“归还某条记录”；具体的 PocketBase collection 名称、排序字段、过滤条件和异常处理由服务层负责。这样做的好处是当 PocketBase 对非法字段排序返回 \texttt{400} 时，只需要修正服务层查询，不需要逐个修改页面组件。
 
-\begin{table}[htbp]
-\centering
-\caption{主要接口调用设计}
-\label{tab:api-design}
-\begin{tabularx}{0.95\textwidth}{l>{\RaggedRight\arraybackslash}X>{\RaggedRight\arraybackslash}X}
-\toprule
-\textbf{服务方法} & \textbf{PocketBase 资源} & \textbf{说明} \\
-\midrule
-\texttt{login} & \texttt{profiles/auth-}\newline\texttt{with-password} & 使用邮箱密码登录，并读取角色字段。 \\
-\texttt{getBooks} & \texttt{books/records} & 分页读取图书，按创建时间或标题排序。 \\
-\texttt{getCategories} & \texttt{categories/records} & 读取分类，用于筛选按钮和图书编辑。 \\
-\texttt{borrowBook} & \texttt{borrow\_records/records}、\texttt{books/records} & 创建借阅记录并扣减库存。 \\
-\texttt{returnBook} & \texttt{borrow\_records/records}、\texttt{books/records} & 写入归还日期并恢复库存。 \\
-\texttt{getDashboardStats} & 多个 collection & 聚合图书、学生、借阅记录并生成统计值。 \\
-\bottomrule
-\end{tabularx}
+\begin{table}[H]
+    \centering
+    \caption{主要接口调用设计}
+    \label{tab:api-design}
+    \begin{tabularx}{0.95\textwidth}{l>{\RaggedRight\arraybackslash}X>{\RaggedRight\arraybackslash}X}
+        \toprule
+        \textbf{服务方法}              & \textbf{PocketBase 资源}                                  & \textbf{说明}         \\
+        \midrule
+        \texttt{login}             & \texttt{profiles/auth-}\newline\texttt{with-password}   & 使用邮箱密码登录，并读取角色字段。   \\
+        \texttt{getBooks}          & \texttt{books/records}                                  & 分页读取图书，按创建时间或标题排序。  \\
+        \texttt{getCategories}     & \texttt{categories/records}                             & 读取分类，用于筛选按钮和图书编辑。   \\
+        \texttt{borrowBook}        & \texttt{borrow\_records/records}、\texttt{books/records} & 创建借阅记录并扣减库存。        \\
+        \texttt{returnBook}        & \texttt{borrow\_records/records}、\texttt{books/records} & 写入归还日期并恢复库存。        \\
+        \texttt{getDashboardStats} & 多个 collection                                           & 聚合图书、学生、借阅记录并生成统计值。 \\
+        \bottomrule
+    \end{tabularx}
 \end{table}
 
 \section{数据库迁移与性能优化设计}
@@ -170,9 +171,9 @@ available_quantity = total_quantity - sum(unreturned borrow_records.quantity)
 
 图\ref{fig:database-migration-performance}展示了数据库迁移与性能稳定性优化的整体思路。
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.88\textwidth]{database-migration-performance-chatgpt-image-2.png}
+    \includegraphics[width=0.75\textwidth]{database-migration-performance-chatgpt-image-2.png}
     \caption{数据库迁移与性能稳定性优化图}
     \label{fig:database-migration-performance}
 \end{figure}

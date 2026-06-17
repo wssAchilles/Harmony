@@ -50,7 +50,7 @@
 \DeclareFixedFont{\ttm}{T1}{txtt}{m}{n}{10}  % for normal
 
 %代码颜色
-\usepackage{color}
+\usepackage{xcolor}
 \definecolor{deepblue}{rgb}{0,0,0.5}
 \definecolor{deepred}{rgb}{0.6,0,0}
 \definecolor{deepgreen}{rgb}{0,0.5,0}
@@ -60,11 +60,53 @@
 \definecolor{codecomment}{RGB}{100,116,139}
 \definecolor{codestring}{RGB}{21,128,61}
 \definecolor{codekeyword}{RGB}{37,99,235}
+\definecolor{codeannotation}{RGB}{168,85,47}
 
-\lstdefinestyle{codexcode}{
-    language=bash,
+% Dart 语言定义
+\lstdefinelanguage{Dart}{
+  morekeywords={import, export, library, part, of, as, show, hide,
+    class, abstract, extends, implements, with, mixin, enum,
+    typedef, extension,
+    void, var, final, const, static, late, required, covariant,
+    dynamic, null, true, false, this, super, new,
+    if, else, for, while, do, switch, case, default, break, continue,
+    return, throw, try, catch, finally, on, rethrow, assert,
+    async, await, yield, sync, Future, Stream, FutureOr,
+    get, set, operator, factory, external,
+    is, is!, as},
+  morekeywords={[2]
+    int, double, String, bool, num, List, Map, Set, Object, Type, Function,
+    Widget, State, StatelessWidget, StatefulWidget, BuildContext,
+    Key, WidgetState, WidgetStatesController,
+    MaterialApp, Scaffold, AppBar, Body, Text, Icon, IconButton,
+    Container, Column, Row, Stack, Wrap, Expanded, Flexible, Padding,
+    EdgeInsets, Alignment, BoxDecoration, BorderRadius, Color,
+    TextStyle, FontWeight, TextAlign, Overflow,
+    ListView, GridView, SingleChildScrollView, Card, ListTile,
+    Navigator, MaterialPageRoute, Route,
+    TextEditingController, FocusNode, Form, TextFormField,
+    InputDecoration, OutlineInputBorder,
+    CircularProgressIndicator, RefreshIndicator,
+    FloatingActionButton, ElevatedButton, TextButton, OutlinedButton,
+    showDialog, showModalBottomSheet,
+    setState, initState, dispose, build, didChangeDependencies,
+    Provider, ChangeNotifier, ChangeNotifierProvider, Consumer,
+    PocketBase, RecordModel, ResultList},
+  morekeywords={[3] @override, @immutable, @required, @protected, @deprecated},
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]',
+  morestring=[b]",
+  morestring=[b]""",
+  sensitive=true
+}
+
+% 公共代码样式
+\lstdefinestyle{codestyle}{
     basicstyle=\ttfamily\footnotesize\color{codetext},
     keywordstyle=\bfseries\color{codekeyword},
+    keywordstyle={[2]\color{deepblue}},
+    keywordstyle={[3]\itshape\color{codeannotation}},
     commentstyle=\itshape\color{codecomment},
     stringstyle=\color{codestring},
     backgroundcolor=\color{codebg},
@@ -84,8 +126,22 @@
     showstringspaces=false,
     numbers=none,
     tabsize=2,
+}
+
+% Shell / 命令行代码样式
+\lstdefinestyle{codexcode}{
+    style=codestyle,
+    language=bash,
     literate={~}{{\textasciitilde}}1
              {_}{{\_}}1
+             {$}{{\$}}1
+}
+
+% Dart 代码样式
+\lstdefinestyle{dartcode}{
+    style=codestyle,
+    language=Dart,
+    literate={~}{{\textasciitilde}}1
              {$}{{\$}}1
 }
 \lstset{style=codexcode}

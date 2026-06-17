@@ -93,7 +93,7 @@ PocketBase 客户端初始化位于服务层的 \texttt{pocketbase\_client.dart}
 
 \section{分类管理模块}
 
-{\RaggedRight\emergencystretch=2em 分类管理页面如图\ref{fig:category}所示，用于维护图书分类集合。分类数据来自 \texttt{categories}\hspace{0pt} collection，图书表中的 \texttt{category\_id} 与分类 id 对应。页面提供分类查看、添加、编辑和删除能力，图书列表顶部的分类筛选按钮也直接来自该集合。\par}
+ {\RaggedRight\emergencystretch=2em 分类管理页面如图\ref{fig:category}所示，用于维护图书分类集合。分类数据来自 \texttt{categories}\hspace{0pt} collection，图书表中的 \texttt{category\_id} 与分类 id 对应。页面提供分类查看、添加、编辑和删除能力，图书列表顶部的分类筛选按钮也直接来自该集合。\par}
 
 \begin{figure}[!htbp]
     \centering
@@ -127,32 +127,33 @@ PocketBase 客户端初始化位于服务层的 \texttt{pocketbase\_client.dart}
 
 逾期未还页面如图\ref{fig:overdue}所示。系统以 \texttt{return\_date} 是否为空判断是否仍在借，以 \texttt{due\_date} 与当前日期比较判断是否逾期。页面会显示逾期天数、图书、借阅人、班级或角色、借阅日期和应还日期。
 
-借阅记录的显示需要同时解析图书、学生和用户资料。对于学生借阅，页面优先显示学生姓名和班级；对于教师借阅，页面显示教师姓名和角色。此前页面中出现过“null - 未分配班级”的情况，根因是教师借阅没有学生班级字段，而页面统一按学生展示方式拼接文本。修复后页面按 \texttt{student\_id} 和 \texttt{profile\_id} 区分借阅对象，避免把教师借阅误显示为学生班级缺失。
+
 
 借阅数量也需要保持统一口径。一次借阅可以包含多本同名图书，因此 \texttt{quantity} 不应被忽略。图书详情中的“已借出”表示所有未归还记录的数量总和；个人中心的“我的借阅”只展示当前登录用户的记录；管理员记录页展示全局记录。三个页面统计对象不同，但都基于同一张 \texttt{borrow\_records} 表计算。
 
-\begin{figure}[!htbp]
+\begin{figure}[H]
     \centering
-    \begin{subfigure}[t]{0.27\textwidth}
-        \centering
-        \includegraphics[width=\linewidth]{图书借阅人员查询.png}
-        \caption{图书借阅人员查询}
-        \label{fig:borrow-query}
-    \end{subfigure}
-    \hspace{0.03\textwidth}
-    \begin{subfigure}[t]{0.27\textwidth}
-        \centering
-        \includegraphics[width=\linewidth]{管理员借阅记录查询.png}
-        \caption{管理员借阅记录查询}
-        \label{fig:admin-records}
-    \end{subfigure}
-    \hspace{0.03\textwidth}
-    \begin{subfigure}[t]{0.27\textwidth}
-        \centering
-        \includegraphics[width=\linewidth]{逾期未还查询.png}
-        \caption{逾期未还图书查询}
-        \label{fig:overdue}
-    \end{subfigure}
+    \makebox[\textwidth]{%
+        \begin{subfigure}[t]{0.27\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{图书借阅人员查询.png}
+            \caption{图书借阅人员查询}
+            \label{fig:borrow-query}
+        \end{subfigure}
+        \hspace{0.03\textwidth}
+        \begin{subfigure}[t]{0.27\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{管理员借阅记录查询.png}
+            \caption{管理员借阅记录查询}
+            \label{fig:admin-records}
+        \end{subfigure}
+        \hspace{0.03\textwidth}
+        \begin{subfigure}[t]{0.27\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{逾期未还查询.png}
+            \caption{逾期未还图书查询}
+            \label{fig:overdue}
+        \end{subfigure}}%
     \caption{借阅记录、管理员记录与逾期查询页面}
 \end{figure}
 
@@ -189,6 +190,122 @@ PocketBase 客户端初始化位于服务层的 \texttt{pocketbase\_client.dart}
 在鸿蒙模拟器中，\texttt{127.0.0.1} 指向模拟器自身，不是 Mac 宿主机。因此图片加载和 API 请求都必须使用 \texttt{10.0.2.2} 或真机可访问的局域网 IP。此前图片一直显示加载圆环，根因就是 URL 指向或静态目录不可达，而不是 Flutter 图片组件本身无法渲染。
 
 图片加载链路可以拆分为四个环节：数据库字段保存相对路径、PocketBase 静态目录存在对应文件、前端根据 base URL 拼接完整地址、图片组件发起网络请求并渲染。任一环节错误都会表现为封面空白或持续加载。最终方案选择相对路径而不是写死完整 URL，是为了同时兼容模拟器和真机；只要 base URL 切换正确，数据库中的封面路径无需再次迁移。
+
+\section{自定义图表组件实现}
+
+本项目在图书分析报告、班级阅读报告和仪表盘统计中使用多种图表组件。这些图表采用 Flutter 的 \texttt{CustomPainter} 自定义绘制，而非第三方图表库，以保证在鸿蒙平台上的兼容性和可维护性\cite{flutter_custom_painting}。
+
+\begin{figure}[!htbp]
+    \centering
+    \makebox[\textwidth]{%
+        \begin{subfigure}[t]{0.3\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{个人阅读报告.png}
+            \caption{学生个人阅读报告主页}
+            \label{fig:student-reading-report}
+        \end{subfigure}
+        \hspace{0.05\textwidth}
+        \begin{subfigure}[t]{0.3\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{个人阅读报告详细数据.png}
+            \caption{阅读报告详细数据展示}
+            \label{fig:reading-report-detail}
+        \end{subfigure}
+        \hspace{0.05\textwidth}
+        \begin{subfigure}[t]{0.3\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{班级阅读报告仪表盘.png}
+            \caption{班级阅读报告仪表盘}
+            \label{fig:class-report-dashboard}
+        \end{subfigure}}%
+    \caption{阅读报告系统 - 个人报告与班级报告界面}
+    \label{fig:reading-report-system}
+\end{figure}
+
+图表组件主要包括四种类型。\textbf{雷达图}（InterestRadarChart）使用 \texttt{CustomPainter} 在 Canvas 上绘制多边形网格，展示多维度兴趣分布，最多支持 6 个维度的数据点连接和标签展示。\textbf{趋势柱状图}（ReadingTrendChart）采用水平可滚动设计，自动计算最高值作为参考，展示月度或学期借阅趋势。\textbf{进度条指标}（ReadingMetricBars）以水平条形展示分类或标签的借阅频次，支持自定义颜色区分。\textbf{指标网格}（ReportMetricGrid）使用 2 列或 4 列响应式布局，每个单元格包含图标、数值和标签，用于统计概览。
+
+\begin{figure}[!htbp]
+    \centering
+    \makebox[\textwidth]{%
+        \begin{subfigure}[t]{0.3\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{个人详细数据.png}
+            \caption{学生个人详情页}
+            \label{fig:student-detail}
+        \end{subfigure}
+        \hspace{0.05\textwidth}
+        \begin{subfigure}[t]{0.3\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{个人兴趣排名.png}
+            \caption{阅读偏好与兴趣排名}
+            \label{fig:interest-ranking}
+        \end{subfigure}
+        \hspace{0.05\textwidth}
+        \begin{subfigure}[t]{0.3\textwidth}
+            \centering
+            \includegraphics[width=\linewidth]{个人借阅历史.png}
+            \caption{个人借阅历史记录}
+            \label{fig:borrow-history}
+        \end{subfigure}}%
+    \caption{个人中心 - 学生档案与借阅历史}
+    \label{fig:personal-center}
+\end{figure}
+
+图表组件的核心实现位于 \texttt{lib/ui/widgets/reading\_report\_widgets.dart}。雷达图使用 \texttt{Canvas.drawPolygon} 绘制多边形网格，通过 \texttt{Path} 对象连接多个数据点；柱状图通过计算柱体宽度和高度实现自适应布局；进度条组件则使用 \texttt{LinearGradient} 创建渐变填充效果。所有图表组件均支持响应式设计，能适应不同屏幕宽度。
+
+\section{班级阅读报告模块}
+
+班级阅读报告模块用于分析班级整体的阅读情况，如图\ref{fig:class-report-features}所示。该模块从仪表盘右上角图标进入，支持下拉选择器切换不同班级查看报告。
+
+\begin{figure}[!htbp]
+    \centering
+    \begin{subfigure}[t]{0.3\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{班级阅读报告阅读分布.png}
+        \caption{班级分类阅读分布}
+        \label{fig:class-distribution}
+    \end{subfigure}
+    \hspace{0.05\textwidth}
+    \begin{subfigure}[t]{0.3\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{班级评语.png}
+        \caption{老师评语与班级建议}
+        \label{fig:class-evaluation}
+    \end{subfigure}
+    \caption{班级阅读报告 - 分布分析与评语建议}
+    \label{fig:class-report-features}
+\end{figure}
+
+班级阅读报告页面主要分为四个功能区。\textbf{班级信息区}展示学生人数、活跃阅读者、累计借阅和逾期统计。\textbf{分类兴趣区}使用雷达图展示全班整体兴趣分布，多边形面积填充区分不同维度。\textbf{评语建议区}包含老师评语和阅读建议，并根据班级共同兴趣推荐图书，推荐算法综合考虑图书评分、分类匹配和标签匹配加权。\textbf{月度趋势区}展示班级整体的借阅趋势，帮助教师了解班级阅读活跃度变化。
+
+班级报告的核心服务是 \texttt{ReadingReportService} 中的班级报告生成方法。该方法聚合班级所有学生的借阅记录，统计分类和标签的使用频次，计算月度和学期趋势数据，并基于班级共同兴趣进行图书推荐。推荐评分公式为：基础分 = 图书当前评分；分类匹配加分 = +4（如果匹配常借分类）；标签匹配加分 = 每匹配 1 个标签 +2。按综合分数排序后取 Top 5 推荐图书。
+
+\section{图书馆仪表盘统计功能}
+
+图书馆仪表盘提供全馆级别的借阅统计和分析，如图\ref{fig:dashboard-statistics}所示。该模块在原有概览统计基础上，新增了分类借阅分布、标注排名和月度趋势等深度分析功能。
+
+\begin{figure}[!htbp]
+    \centering
+    \begin{subfigure}[t]{0.3\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{图书馆仪表盘分类.png}
+        \caption{分类借阅分布}
+        \label{fig:category-distribution}
+    \end{subfigure}
+    \hspace{0.05\textwidth}
+    \begin{subfigure}[t]{0.3\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{图书馆仪表盘排名.png}
+        \caption{标注排名与月度趋势}
+        \label{fig:ranking-trend}
+    \end{subfigure}
+    \caption{图书馆仪表盘 - 分类分布与排名分析}
+    \label{fig:dashboard-statistics}
+\end{figure}
+
+仪表盘统计功能主要包括三类数据展示。\textbf{分类借阅分布}使用水平条形图展示各图书分类的借阅次数，帮助管理员了解各类图书的受欢迎程度；条形图采用蓝色渐变填充，按借阅次数从高到低排序。\textbf{标注兴趣方向}同样使用条形图展示标签维度的借阅统计，采用青色渐变填充以区分分类维度。\textbf{月度借阅趋势}使用柱状图展示近 6 个月的借阅量变化，帮助识别借阅高峰期。
+
+仪表盘统计的数据来自 \texttt{DashboardService}，该服务复用借阅记录计算统计值，避免为每个卡片单独发起请求。分类和标签的统计通过聚合 \texttt{borrow\_records} 表中的分类 id 和标签字段实现。月度趋势则按 \texttt{borrow\_date} 所在月份分组统计借阅次数。这些统计数据会在前端缓存，减少重复请求对服务器的压力。
 
 \section{界面适配与交互实现}
 
