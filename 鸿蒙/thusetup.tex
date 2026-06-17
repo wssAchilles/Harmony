@@ -31,9 +31,6 @@
 % 表格中支持跨行
 \usepackage{multirow}
 
-% 固定宽度的表格。
-% \usepackage{tabularx}
-
 % 跨页表格
 \usepackage{longtable}
 \usepackage{array}
@@ -235,29 +232,6 @@
   \fi
 }
 \makeatother
-
-\newcommand\cppstyle{\lstset{
-    literate={-}{{-}}1,                % 让 '-' 正常显示
-    language=C++,                      % 设置语言为C++
-    basicstyle=\ttm,                   % 基本字体样式
-    morekeywords={self},               % 根据需要添加更多关键词
-    keywordstyle=\ttb\color{deepblue}, % 关键词样式
-    emph={MyClass,__init__},           % 自定义高亮关键词
-    emphstyle=\ttb\color{deepred},     % 高亮关键词样式
-    stringstyle=\color{deepgreen},     % 字符串样式
-    frame=tb,                          % 在代码块上下添加边框
-    showstringspaces=false,            % 不显示字符串中的空格
-    caption={C++},                     % 设置标题为 "C++"
-    captionpos=t                       % 标题位置在顶部
-}}
-
-% 定义C++环境
-\lstnewenvironment{cpp}[1][]
-{
-    \cppstyle
-    \lstset{#1}
-}
-{}
 
 % hyperref 宏包在最后调用
 \usepackage{hyperref}
